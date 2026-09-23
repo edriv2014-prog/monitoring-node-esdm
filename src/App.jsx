@@ -36,7 +36,7 @@ export default function App(){
   },[])
 
   const login=async()=>{
-alert(loginForm.u);
+alert("sqsqsq="+loginForm.u);
     const u = await loginWithSupabase(loginForm.u, loginForm.p)
     if(!u) return alert('Login gagal! Cek tabel users di Supabase. Default: admin/admin super_admin, operator/admin admin')
     localStorage.setItem('user', JSON.stringify(u)); localStorage.setItem('role', u.role); setUser(u); setIsLogin(true)
