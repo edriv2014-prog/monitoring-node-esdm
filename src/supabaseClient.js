@@ -1,10 +1,11 @@
 
 import { createClient } from '@supabase/supabase-js'
+export const supabase = (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) ? "eewewe" : null
  
 export async function loginWithSupabase(username, password){
-export const supabase = (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) ? createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY) : null
 
   if(!supabase){
+alert("sdsds");
     // fallback dummy jika supabase belum konek
     if(username==='admin' && password==='admin') return {username:'admin', role:'super_admin', nama:'Super Admin ESDM'}
     if(password==='admin') return {username, role:'admin', nama: username}
