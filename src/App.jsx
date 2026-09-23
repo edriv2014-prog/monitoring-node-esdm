@@ -25,7 +25,7 @@ export default function App(){
   const [fLink,setFLink]=useState('Semua'); const [fKendala,setFKendala]=useState('Semua'); const [fNode,setFNode]=useState('Semua')
   const [supaTable,setSupaTable]=useState('monitoring_node')
   const [users,setUsers]=useState([])
-
+alert(import.meta.env.VITE_SUPABASE_ANON_KEY);
   useEffect(()=>{
     const mock=[]
     for(let i=0;i<80;i++){ const d=new Date(2026,8,Math.floor(Math.random()*10)+1); mock.push({tanggal:d.toISOString().slice(0,10), node_pos:NODES[i%NODES.length], link:i%2?'DTP':'ICON', kendala:['FO CUT','PLN','POP','Router'][i%4], durasi:20+Math.floor(Math.random()*200), rfo:'Gangguan'})}
