@@ -21,7 +21,7 @@ export default function App(){
     const fetchData = async () => {
       try {
         if(BACKEND_URL){
-          alert(BACKEND_URL);
+          alert(`${BACKEND_URL}/api/data?gid=${GID}`);
           const r = await fetch(`${BACKEND_URL}/api/data?gid=${GID}`)
           const j = await r.json()
           if(j.data) { setRawData(j.data); return }
