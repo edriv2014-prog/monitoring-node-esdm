@@ -12,19 +12,24 @@ const normalize = (d) => {
   const rawTanggal = d["Tanggal (Otomatis)"] || d.Tanggal || ''
   const detail = d["Detail Outage"] || ''
 
-  // "1. Geowisata Inn\nDuration : 8 Jam 3 Menit\nRFO :..."
-  const node = detail.split('\n')[0]?.replace(/^\d+\.\s*/, '') || '-'
-  const durasiMatch = detail.match(/Duration\s*:\s*(.*)/i)
-  const rfoMatch = detail.match(/RFO\s*:\s*(.*)/i)
+  const node = detail.split('\n')[0]?.replace(/^\d+\.\s*/, '').trim() || '-'
+  const durasi = detail.match(/Duration\s*:\s*(.*)/i)?.[1] || '-'
+  const rfo = detail.match(/RFO\s*:\s*(.*)/i)?.[1] || ''
+
+  // Parse 01 Jan 2026 -> 2026-01-01
+  let tglDisplay = rawTanggal
+  let tglObj = new Date(rawTanggal)
+  if (isNaN(tglObj) && rawTanggal.includes('Jan')) {
+     tglObj = new Date(rawTanggal.replace('Jan','January'))
+  }
 
   return {
-    Tanggal: rawTanggal,
-    // biar filter jalan
+    Tanggal: tglDisplay, // tampilkan apa adanya "01 Jan 2026"
+    TanggalObj: tglObj, // buat sorting
     'Node/Pos': node,
-    LINK: d["DTP Backhaul"] || d.Status || 'Normal',
-    KENDALA: rfoMatch?.[1] || detail.slice(0, 80) || d["Potensi Gangguan"] || '-',
-    Durasi: durasiMatch?.[1] || '-',
-    _raw: d // simpan raw buat debug
+    LINK: d["DTP Backhaul"] || d["Status"] || 'Normal',
+    KENDALA: rfo || '-',
+    Durasi: durasi,
   }
 }
 
