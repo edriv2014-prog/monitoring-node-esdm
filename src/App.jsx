@@ -10,7 +10,7 @@ export default function App(){
   const [link,setLink]=useState("Semua")
   const [period,setPeriod]=useState("Semua")
   const [page,setPage]=useState(0)
-
+  
   useEffect(()=>{ fetch(API).then(r=>r.json()).then(j=>setData(j.data||j||[])) },[])
 
   const filtered = useMemo(()=>{
