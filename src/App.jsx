@@ -9,26 +9,24 @@ const RENTANG_OPTIONS = ['1 Hari','7 Hari','30 Hari','90 Hari','Semua']
 
 // INI KUNCINYA - UBAH DATA SHEET ASLI JADI FORMAT FRONTEND
 const normalize = (d) => {
-  const rawTanggal = d["Tanggal (Otomatis)"] || d.Tanggal || ''
-  const detail = d["Detail Outage"] || ''
+  // cari key tanggal apapun yang ada kata "Tanggal"
+  const keys = Object.keys(d)
+  const tglKey = keys.find(k => k.toLowerCase().includes('tanggal')) || ''
+  const rawTanggal = d[tglKey] || ''
+
+  const detailKey = keys.find(k => k.toLowerCase().includes('outage')) || 'Detail Outage'
+  const detail = d[detailKey] || ''
 
   const node = detail.split('\n')[0]?.replace(/^\d+\.\s*/, '').trim() || '-'
-  const durasi = detail.match(/Duration\s*:\s*(.*)/i)?.[1] || '-'
-  const rfo = detail.match(/RFO\s*:\s*(.*)/i)?.[1] || ''
-
-  // Parse 01 Jan 2026 -> 2026-01-01
-  let tglDisplay = rawTanggal
-  let tglObj = new Date(rawTanggal)
-  if (isNaN(tglObj) && rawTanggal.includes('Jan')) {
-     tglObj = new Date(rawTanggal.replace('Jan','January'))
-  }
+  const durasi = detail.match(/Duration\s*:\s*(.*)/i)?.[1]?.trim() || '-'
+  const rfo = detail.match(/RFO\s*:\s*(.*)/i)?.[1]?.trim() || detail.slice(0,60) || '-'
 
   return {
-    Tanggal: tglDisplay, // tampilkan apa adanya "01 Jan 2026"
-    TanggalObj: tglObj, // buat sorting
+    Tanggal: rawTanggal || '-', // JANGAN kosongin, tampilkan apa adanya
+    TanggalObj: new Date(rawTanggal),
     'Node/Pos': node,
-    LINK: d["DTP Backhaul"] || d["Status"] || 'Normal',
-    KENDALA: rfo || '-',
+    LINK: d["DTP Backhaul"] || d.Status || 'Normal',
+    KENDALA: rfo,
     Durasi: durasi,
   }
 }
