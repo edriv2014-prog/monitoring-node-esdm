@@ -1,6 +1,6 @@
 
-import { useEffect, useMemo, useState } from 'react'
 import Papa from 'papaparse'
+import { useEffect, useMemo, useState } from 'react'
 
 const SHEET_ID = import.meta.env.VITE_SHEET_ID || '1f83CxoN-7Oqa_F7LwqeJfK8bIrpW0wGJgZAkkcVgbik'
 const GID = import.meta.env.VITE_GID || '285923348'
@@ -21,6 +21,7 @@ export default function App(){
     const fetchData = async () => {
       try {
         if(BACKEND_URL){
+          alert(BACKEND_URL);
           const r = await fetch(`${BACKEND_URL}/api/data?gid=${GID}`)
           const j = await r.json()
           if(j.data) { setRawData(j.data); return }
