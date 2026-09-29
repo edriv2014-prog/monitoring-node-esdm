@@ -29,6 +29,62 @@ export default function App(){
   const [editUser,setEditUser]=useState(null)
   const [formUser,setFormUser]=useState({username:'',password:'',role:'user',nama:''})
 
+  // REKAP >3 HARI BERTURUT-TURUT
+  const rekap3HariBurut = useMemo(()=>{
+    const map = {}
+    data.forEach(d=>{
+      const node = d["Node/Pos"]?.trim()
+      if(!node) return
+      if(!map[node]) map[node] = []
+      map[node].push(d)
+    })
+
+    const hasil = []
+
+    Object.entries(map).forEach(([node, rows])=>{
+      // sort by tanggal asc
+      const sorted = rows
+      .map(r=>({...r, _tgl: parseTgl(r.Tanggal)}))
+      .sort((a,b)=>a._tgl - b._tgl)
+
+      let streak = [sorted[0]]
+      for(let i=1;i<sorted.length;i++){
+        const diff = (sorted[i]._tgl - sorted[i-1]._tgl)/86400000 // selisih hari
+        if(diff <= 1.5){ // masih berturut ( toleransi 1 hari )
+          streak.push(sorted[i])
+        }else{
+          if(streak.length >= 3){
+            hasil.push({
+              node,
+              LINK: streak[0].LINK,
+              mulai: streak[0].Tanggal,
+              sampai: streak[streak.length-1].Tanggal,
+              durasi: streak.length,
+              kendala_terakhir: streak[streak.length-1].KENDALA,
+              detail: streak
+            })
+          }
+          streak = [sorted[i]]
+        }
+      }
+      // cek sisa streak terakhir
+      if(streak.length >= 3){
+        hasil.push({
+          node,
+          LINK: streak[0].LINK,
+          mulai: streak[0].Tanggal,
+          sampai: streak[streak.length-1].Tanggal,
+          durasi: streak.length,
+          kendala_terakhir: streak[streak.length-1].KENDALA,
+          detail: streak
+        })
+      }
+    })
+
+    // sort yang paling lama dulu
+    return hasil.sort((a,b)=>b.durasi - a.durasi)
+  },[data])
+
   useEffect(()=>{ localStorage.setItem(LS_USERS, JSON.stringify(users)) },[users])
   useEffect(()=>{ fetch(API).then(r=>r.json()).then(j=>setData(j.data||[])) },[])
 
@@ -121,6 +177,29 @@ export default function App(){
   }
 
   return(
+    {period==='3H+' && (
+  <div style={{background:'#fff',borderRadius:12,padding:12}}>
+    <h3 style={{fontWeight:800,marginBottom:8}}>Rekap Node Down >3 Hari Berturut ({rekap3HariBurut.length} Node)</h3>
+    <table style={{width:'100%',fontSize:13,borderCollapse:'collapse'}}>
+      <thead style={{background:'#000',color:'#fff'}}>
+        <tr><th style={{padding:10,textAlign:'left'}}>Node/Pos</th><th>LINK</th><th>Mulai</th><th>Sampai</th><th>Durasi</th><th style={{textAlign:'left'}}>Kendala Terakhir</th></tr>
+      </thead>
+      <tbody>
+        {rekap3HariBurut.map((r,i)=>(
+          <tr key={i} style={{borderBottom:'1px solid #eee',background:r.durasi>=5?'#fee2e2':'#fef3c7'}}>
+            <td style={{padding:10,fontWeight:700}}>{r.node}</td>
+            <td style={{padding:10,textAlign:'center'}}>{r.LINK}</td>
+            <td style={{padding:10}}>{r.mulai}</td>
+            <td style={{padding:10}}>{r.sampai}</td>
+            <td style={{padding:10,textAlign:'center',fontWeight:800}}>{r.durasi} hari</td>
+            <td style={{padding:10,maxWidth:400}}>{r.kendala_terakhir}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+    <div style={{fontSize:11,color:'#64748b',marginTop:8}}>* Kuning = 3-4 hari, Merah = 5 hari+ berturut-turut down</div>
+  </div>
+    )}
     <div style={{minHeight:'100vh',background:'#f1f5f9',padding:16,fontFamily:'sans-serif'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
         <h1 style={{fontSize:22,fontWeight:800}}>Rekap Laporan 2026 - ICON & DTP | Hi, {session.nama} ({session.role})</h1>
