@@ -1,50 +1,91 @@
-"use client"
-import { useEffect, useState } from "react"
-type Row = { Tanggal: string; "Node/Pos": string; LINK: string; KENDALA: string }
+import { useEffect, useState, useMemo } from "react"
 const API_BASE = "https://monitoring-node-esdm-api.vercel.app/api/data?gid=285923348"
 
-export default function Page(){
-  const [data, setData] = useState<Row[]>([])
-  const [mode, setMode] = useState<'all'|'3hari'>('3hari') // default 3hari biar kayak image_fc7402.png
+export default function App(){
+  const [allData, setAllData] = useState([])
+  const [data, setData] = useState([])
+  const [mode, setMode] = useState('all')
   const [loading, setLoading] = useState(true)
 
+  // Fetch semua data sekali aja
   useEffect(()=>{
     setLoading(true)
-    const url = mode==='3hari'? `${API_BASE}&filter=3hari` : API_BASE
-    fetch(url).then(r=>r.json()).then(j=>{
-      setData(j.data||[])
+    fetch(API_BASE).then(r=>r.json()).then(j=>{
+      const d = j.data||[]
+      setAllData(d)
+      setData(d)
       setLoading(false)
     })
-  },[mode])
+  },[])
+
+  // HITUNG 3H+ LOKAL - biar gak tergantung API filter
+  const { threeSet, streakMap } = useMemo(()=>{
+    const bulan={Jan:0,Feb:1,Mar:2,Apr:3,Mei:4,May:4,Jun:5,Jul:6,Agu:7,Aug:7,Sep:8,Okt:9,Oct:9,Nov:10,Des:11,Dec:11}
+    function toDayKey(s){
+      const m=s.match(/(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})/)
+      if(!m) return null
+      return new Date(+m[3],bulan[m[2]]??0,+m[1]).toISOString().slice(0,10)
+    }
+    const map={}
+    allData.forEach(o=>{
+      const k=o["Node/Pos"]
+      if(!map[k]) map[k]=[]
+      const day=toDayKey(o.Tanggal)
+      if(day) map[k].push(day)
+    })
+
+    const threeSet = new Set()
+    const streakMap = {}
+    for(const node in map){
+      const uniq=[...new Set(map[node])].sort()
+      if(uniq.length===0) continue
+      let cur=1, max=1
+      for(let i=1;i<uniq.length;i++){
+        const diff=(new Date(uniq[i])-new Date(uniq[i-1]))/86400000
+        if(diff===1) cur++
+        else cur=1
+        max=Math.max(max,cur)
+      }
+      streakMap[node]=max
+      if(max>=3) threeSet.add(node)
+    }
+    return { threeSet, streakMap }
+  },[allData])
+
+  // Filter data kalau mode 3hari
+  useEffect(()=>{
+    if(mode==='3hari'){
+      setData(allData.filter(r=> threeSet.has(r["Node/Pos"])))
+    }else{
+      setData(allData)
+    }
+  },[mode, threeSet, allData])
 
   return (
-    <div className="min-h-screen bg-[#fef3c7] p-4">
-      <div className="max-w-7xl mx-auto bg-white rounded-xl shadow overflow-hidden">
-        <div className="bg-black text-white p-4 flex justify-between items-center">
-          <h1 className="font-bold">Monitoring ESDM {mode==='3hari'? '- 3 Hari Berturut ('+data.length+')' : ''}</h1>
-          <div className="flex gap-2">
-            <button onClick={()=>setMode('all')} className={`px-4 py-1 rounded-full text-sm ${mode==='all'?'bg-white text-black':'bg-zinc-700'}`}>Semua</button>
-            <button onClick={()=>setMode('3hari')} className={`px-4 py-1 rounded-full text-sm ${mode==='3hari'?'bg-red-600 text-white':'bg-zinc-700'}`}>🔥 3 Hari</button>
+    <div style={{minHeight:'100vh', background:'#fef3c7', padding:20}}>
+      <div style={{maxWidth:1400, margin:'0 auto', background:'white', borderRadius:12, overflow:'hidden', boxShadow:'0 4px 6px rgba(0,0,0,0.1)'}}>
+        <div style={{background:'black', color:'white', padding:16, display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+          <h1 style={{fontWeight:'bold'}}>Monitoring ESDM {mode==='3hari'? `- 3H+ (${threeSet.size} Node)` : `- Total ${allData.length}`}</h1>
+          <div style={{display:'flex', gap:8}}>
+            <button onClick={()=>setMode('all')} style={{padding:'6px 16px', borderRadius:20, background:mode==='all'?'white':'#333', color:mode==='all'?'black':'white', border:'none', cursor:'pointer'}}>Semua</button>
+            <button onClick={()=>setMode('3hari')} style={{padding:'6px 16px', borderRadius:20, background:mode==='3hari'?'#dc2626':'#333', color:'white', border:'none', cursor:'pointer'}}>🔥 3H+ ({threeSet.size})</button>
           </div>
         </div>
 
-        <div className="overflow-auto">
-          <div className="min-w-">
-            <div className="grid grid-cols-[90px_180px_60px_1fr_130px] gap-2 bg-black text-white p-3 text-sm font-bold">
+        <div style={{overflowX:'auto'}}>
+          <div style={{minWidth:1000}}>
+            <div style={{display:'grid', gridTemplateColumns:'90px 200px 60px 1fr 130px', gap:8, background:'black', color:'white', padding:12, fontWeight:'bold', fontSize:13}}>
               <div>Tanggal</div><div>Node/Pos</div><div>LINK</div><div>KENDALA</div><div>STATUS</div>
             </div>
-            {loading? <div className="p-10 text-center">Loading...</div> : data.map((r,i)=>(
-              <div key={i} className={`grid grid-cols-[90px_180px_60px_1fr_130px] gap-2 p-3 text-sm border-b ${i%2?'bg-amber-100':'bg-amber-50'}`}>
-                <div>{r.Tanggal}</div>
-                <div className="font-bold">{r["Node/Pos"]}</div>
-                <div><span className="bg-zinc-300 px-2 py-0.5 rounded text-xs">Icon</span></div>
-                <div className="whitespace-pre-wrap">{r.KENDALA}</div>
-                <div>{mode==='3hari'? <span className="bg-red-600 text-white px-2 py-1 rounded-full text-xs font-bold">🔥 3 HARI</span> : <span className="text-gray-400 text-xs">-</span>}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
+            {loading? <div style={{padding:40, textAlign:'center'}}>Loading...</div> : data.map((r,i)=>{
+              const is3H = threeSet.has(r["Node/Pos"])
+              const streak = streakMap[r["Node/Pos"]]||1
+              return (
+                <div key={i} style={{display:'grid', gridTemplateColumns:'90px 200px 60px 1fr 130px', gap:8, padding:12, fontSize:13, borderBottom:'1px solid #eee', background:is3H?'#fecaca':i%2?'#fef3c7':'#fffbeb'}}>
+                  <div>{r.Tanggal}</div>
+                  <div style={{fontWeight:'bold'}}>{r["Node/Pos"]}</div>
+                  <div><span style={{background:'#d1d5db', padding:'2px 8px', borderRadius:4, fontSize:11}}>Icon</span></div>
+                  <div style={{whiteSpace:'pre-wrap'}}>{r.KENDALA}</div>
+                  <div>
+                    {is3H? <span style={{background:'#dc2626', color:'white', padding:'4px 8px', borderRadius:20, fontSize:11, fontWeight:'bold'}}>🔥 {streak}H+ BERTURUT</span>
+                    : streak===2? <span style={{background:'#facc15', padding:'4px 8px', borderRadius:20, fontSize:11}}>2 Hari
