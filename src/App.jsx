@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react"
-const API_BASE = "https://monitoring-node-esdm-api.vercel.app/api/data?gid=285923348"
+const API_BASE = `${process.env.VITE_BACKEND_URL}/data?gid=${process.env.VITE_GID}`
 
 export default function App(){
   const [allData, setAllData] = useState([])
