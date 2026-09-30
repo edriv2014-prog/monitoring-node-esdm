@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-const BACKEND = import.meta.env.VITE_BACKEND_URL || "https://monitoring-node-esdm-api.vercel.app/api";
+const BACKEND = import.meta.env.VITE_BACKEND_URL || "https://monitoring-node-esdm-api.vercel.app/api/data";
 const GID = import.meta.env.VITE_GID || "285923348";
 const API_BASE = `${BACKEND}/data?gid=${GID}`;
 alert(API_BASE);
+alert(BACKEND)
 export default function App(){
   const [allData, setAllData] = useState([])
   const [threeData, setThreeData] = useState([])
