@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
-const API_BASE = `${import.meta.env.VITE_BACKEND_URL}/data?gid=${import.meta.env.env.VITE_GID}`
+const API_BASE = `${import.meta.env.VITE_BACKEND_URL}/data?gid=${import.meta.env.VITE_GID}`
 alert(API_BASE)
 export default function App(){
   const [allData, setAllData] = useState([])
