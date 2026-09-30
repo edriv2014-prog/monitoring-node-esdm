@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 const BACKEND = import.meta.env.VITE_BACKEND_URL || "https://monitoring-node-esdm-api.vercel.app/api";
 const GID = import.meta.env.VITE_GID || "285923348";
-const API_BASE = `${BACKEND}/data?gid=${GID}`;
+const API_BASE = `${BACKEND}/api/data?gid=${GID}`;
 
 export default function App(){
   const [mode,setMode]=useState('all')
