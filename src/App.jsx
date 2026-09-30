@@ -1,69 +1,5 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 const API_BASE = `${process.env.VITE_BACKEND_URL}/data?gid=${process.env.VITE_GID}`
-
-const API_BASE = "https://monitoring-node-esdm-api.vercel.app/api/data?gid=285923348"
-
-export default function App(){
-  const [allData, setAllData] = useState([])
-  const [threeData, setThreeData] = useState([])
-  const [nodes3hari, setNodes3hari] = useState([])
-  const [mode, setMode] = useState('all')
-  const [loading, setLoading] = useState(true)
-  const [total, setTotal] = useState(0)
-
-  useEffect(()=>{
-    setLoading(true)
-    Promise.all([
-      fetch(API_BASE).then(r=>r.json()),
-      fetch(API_BASE+"&filter=3hari").then(r=>r.json())
-    ]).then(([jAll, j3])=>{
-      setAllData(jAll.data||[])
-      setTotal(jAll.total||jAll.data?.length||0)
-      setThreeData(j3.data||[])
-      setNodes3hari(j3.nodes3hari||jAll.nodes3hari||[])
-      setLoading(false)
-    }).catch(e=>{
-      console.error(e)
-      setLoading(false)
-    })
-  },[])
-
-  const data = mode==='3hari'? threeData : allData
-
-  return (
-    <div style={{minHeight:'100vh', background:'#fef3c7', padding:20}}>
-      <div style={{maxWidth:1400, margin:'0 auto', background:'white', borderRadius:12, overflow:'hidden', boxShadow:'0 4px 12px rgba(0,0,0,0.1)'}}>
-        <div style={{background:'black', color:'white', padding:16, display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-          <b>Monitoring ESDM - {mode==='3hari'? `🔥 3H+ ${nodes3hari.length} Node / ${threeData.length} baris` : `Total ${total||allData.length} | 🔥 3H+ ${nodes3hari.length} Node`}</b>
-          <div style={{display:'flex', gap:8}}>
-            <button onClick={()=>setMode('all')} style={{padding:'6px 16px', borderRadius:20, background:mode==='all'?'white':'#333', color:mode==='all'?'black':'white', border:'none', cursor:'pointer', fontWeight:'bold'}}>Semua ({total||allData.length})</button>
-            <button onClick={()=>setMode('3hari')} style={{padding:'6px 16px', borderRadius:20, background:mode==='3hari'?'#dc2626':'#333', color:'white', border:'none', cursor:'pointer', fontWeight:'bold'}}>🔥 3H+ ({nodes3hari.length})</button>
-          </div>
-        </div>
-        <div style={{minWidth:900, maxHeight:'80vh', overflowY:'auto'}}>
-          <div style={{display:'grid', gridTemplateColumns:'110px 200px 60px 1fr 90px', gap:8, background:'black', color:'white', padding:12, fontWeight:'bold', fontSize:13, position:'sticky', top:0}}> <div>Tanggal</div><div>Node/Pos</div><div>LINK</div><div>KENDALA</div><div>STATUS</div> </div>
-          {loading? <div style={{padding:40, textAlign:'center'}}>Loading... Total {total||0}</div>
-          : data.map((r,i)=>{
-            const is3H = nodes3hari.includes(r["Node/Pos"])
-            return (
-              <div key={i} style={{display:'grid', gridTemplateColumns:'110px 200px 60px 1fr 90px', gap:8, padding:12, fontSize:13, borderBottom:'1px solid #eee', background: mode==='3hari'? '#fecaca' : is3H? '#fff7ed' : i%2? '#ffffff':'#fef9c3'}}>
-                <div>{r.Tanggal}</div>
-                <div style={{fontWeight:'bold'}}>{r["Node/Pos"]}</div>
-                <div><span style={{background:'#e5e7eb', padding:'2px 8px', borderRadius:4, fontSize:11}}>{r.LINK||"Icon"}</span></div>
-                <div style={{whiteSpace:'pre-wrap', lineHeight:'1.4'}}>{r.KENDALA}</div>
-                <div>{is3H? <span style={{background:'#dc2626', color:'white', padding:'4px 10px', borderRadius:20, fontSize:11, fontWeight:'bold'}}>🔥 3H+</span>: <span style={{color:'#9ca3af', fontSize:11}}>-</span>}</div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-
-
-/*
 
 export default function App(){
   const [allData, setAllData] = useState([])
@@ -212,4 +148,4 @@ export default function App(){
       </div>
     </div>
   )
-}*/
+}
