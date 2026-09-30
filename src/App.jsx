@@ -90,7 +90,7 @@ export default function App(){
   )
 }
 
-
+/*
 export default function App(){
   const [allData, setAllData] = useState([])
   const [threeData, setThreeData] = useState([]) // cuma yang 3H+ beneran
@@ -148,4 +148,4 @@ export default function App(){
       </div>
     </div>
   )
-}
+}*/
