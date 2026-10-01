@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-const GID='285923348';
 const BACKEND = import.meta.env.VITE_BACKEND_URL || "https://monitoring-node-esdm-api.vercel.app/api";
 const GID = import.meta.env.VITE_GID || "285923348";
 
