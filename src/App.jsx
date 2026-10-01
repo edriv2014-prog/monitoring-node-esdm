@@ -1,75 +1,126 @@
-import { useEffect, useState } from "react";
-const BACKEND = import.meta.env.VITE_BACKEND_URL || "https://monitoring-node-esdm-api.vercel.app/api";
-const GID = import.meta.env.VITE_GID || "285923348";
-const API_BASE = `${BACKEND}/api/data?gid=${GID}`;
+import { useState, useEffect, useMemo } from 'react';
 
-export default function App(){
-  const [mode,setMode]=useState('all')
-  const [loading,setLoading]=useState(true)
-  const [allData,setAllData]=useState([])
-  const [threeData,setThreeData]=useState([])
-  const [total,setTotal]=useState(0)
-  const [total3H,setTotal3H]=useState(0)
-  const [nodes3hari,setNodes3hari]=useState([])
-  const [keys3H,setKeys3H]=useState(new Set()) // INI YANG HILANG!
+const GID = '285923348';
+const API_URL = import.meta.env.VITE_API_URL || '/api/data';
 
-  useEffect(()=>{
-    Promise.all([
-      fetch(API_BASE).then(r=>r.json()),
-      fetch(API_BASE+"&filter=3hari").then(r=>r.json())
-    ]).then(([jAll,j3])=>{
-      setAllData(jAll.data||[])
-      setTotal(jAll.total||0)
-      setThreeData(j3.data||[])
-      setNodes3hari(j3.nodes3hari||[])
-      setTotal3H(j3.total3H||j3.count||0)
-      setKeys3H(new Set(j3.keys3hari||[])) // pakai keys, bukan nodes
-      setLoading(false)
-    }).catch(()=>setLoading(false))
-  },[])
+export default function App() {
+  const [data, setData] = useState([]);
+  const [stats, setStats] = useState({});
+  const [filter, setFilter] = useState('semua');
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  const totalTidak3H = total - total3H
-  const data = mode==='3hari'? threeData : allData
+  const filters = [
+    { key: 'semua', label: 'Semua', count: stats.total },
+    { key: '1hari', label: '1H', count: stats.total1H },
+    { key: '3hari', label: '3H+', count: stats.total3H },
+    { key: '7hari', label: '7H', count: stats.total7H },
+    { key: '30hari', label: '30H', count: stats.total30H },
+    { key: '90hari', label: '90H', count: stats.total90H },
+    { key: 'potongan', label: 'Potongan Tanggal Awal', count: stats.totalPotongan },
+  ];
 
-  // cek 3H+ pakai keys3hari yang dari backend (per PROSES bukan per NODE)
-  const isRow3H = (r)=>{
-    // buat key yang sama kayak backend: Tanggal||Node||prosesKey
-    return keys3H.has(r._key) || [...keys3H].some(k=> k.includes(r["Node/Pos"]) && k.includes(r.Tanggal))
-  }
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`${API_URL}?gid=${GID}&filter=${filter}`);
+        const json = await res.json();
+        setData(json.data || []);
+        setStats(json);
+      } catch (e) {
+        console.error(e);
+      }
+      setLoading(false);
+    };
+    fetchData();
+  }, [filter]);
+
+  const filteredData = useMemo(() => {
+    // hapus nourut di frontend juga buat jaga-jaga image_b4aa6c.png
+    return data
+      .map(d => ({
+        ...d,
+        "Node/Pos": String(d["Node/Pos"] || '').replace(/^\s*\d+\.\s*/, '').trim(),
+      }))
+      .filter(d => {
+        if (!search) return true;
+        const s = search.toLowerCase();
+        return (
+          d.Tanggal?.toLowerCase().includes(s) ||
+          d["Node/Pos"]?.toLowerCase().includes(s) ||
+          d.KENDALA?.toLowerCase().includes(s)
+        );
+      });
+  }, [data, search]);
+
+  const is3HPlus = (item) => {
+    // kalau di filter 3H+ 7H 30H 90H sudah pasti merah
+    if (['3hari','7hari','30hari','90hari'].includes(filter)) return true;
+    // kalau stats bilang ini key 3H+ maka merah
+    if (stats.keys3hari?.includes(item._key)) return true;
+    // cek Duration Tgl 10/09 - saat ini >2 hari
+    if (/Tgl\s*\d{1,2}\/\d{1,2}\/\d{4}.*saat ini/i.test(item.KENDALA)) return true;
+    return false;
+  };
 
   return (
-    <div style={{minHeight:'100vh', background:'#fef3c7', padding:20}}>
-      <div style={{maxWidth:1400, margin:'0 auto', background:'white', borderRadius:12, overflow:'hidden'}}>
-        <div style={{background:'black', color:'white', padding:14, display:'flex', justifyContent:'space-between', flexWrap:'wrap', gap:8}}>
-          <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
-            <span style={{background:'white', color:'black', padding:'5px 12px', borderRadius:20, fontSize:12, fontWeight:'bold'}}>Total: {total}</span>
-            <span style={{background:'#16a34a', color:'white', padding:'5px 12px', borderRadius:20, fontSize:12, fontWeight:'bold'}}>✅ Tidak 3H+ Bagus: {totalTidak3H}</span>
-            <span style={{background:'#dc2626', color:'white', padding:'5px 12px', borderRadius:20, fontSize:12, fontWeight:'bold'}}>🔥 Total 3H+ Protes: {total3H} baris / {nodes3hari.length} Node</span>
-          </div>
-          <div style={{display:'flex', gap:8}}>
-            <button onClick={()=>setMode('all')} style={{padding:'6px 14px', borderRadius:20, background:mode==='all'?'white':'#333', color:mode==='all'?'black':'white', border:'none', cursor:'pointer'}}>Semua ({total})</button>
-            <button onClick={()=>setMode('3hari')} style={{padding:'6px 14px', borderRadius:20, background:mode==='3hari'?'#dc2626':'#333', color:'white', border:'none', cursor:'pointer'}}>🔥 3H+ MERAH ({total3H})</button>
-          </div>
-        </div>
+    <div className="min-h-screen bg-gray-50 p-4">
+      <h1 className="text-xl font-bold mb-3">Monitoring Node ESDM</h1>
 
-        <div style={{minWidth:900, maxHeight:'75vh', overflowY:'auto'}}>
-          <div style={{display:'grid', gridTemplateColumns:'110px 200px 60px 1fr 90px', gap:8, background:'black', color:'white', padding:10, fontWeight:'bold', fontSize:12, position:'sticky', top:0}}>
-            <div>Tanggal</div><div>Node/Pos</div><div>LINK</div><div>KENDALA (tanpa 1. & tanpa Node)</div><div>STATUS</div>
-          </div>
-          {loading? <div style={{padding:30, textAlign:'center'}}>Loading...</div> :
-            data.map((r,i)=>{
-              const merah = mode==='3hari'? true : keys3H.has(r._key)
-              return (
-                <div key={i} style={{display:'grid', gridTemplateColumns:'110px 200px 60px 1fr 90px', gap:8, padding:10, fontSize:12, borderBottom:'1px solid #eee', background: merah? '#fecaca' : i%2?'#fff':'#fef9c3', borderLeft: merah? '5px solid #dc2626' : '5px solid #16a34a'}}>
-                  <div>{r.Tanggal}</div><div style={{fontWeight:'bold'}}>{r["Node/Pos"]}</div><div>{r.LINK}</div>
-                  <div style={{whiteSpace:'pre-wrap'}}>{r.KENDALA}</div>
-                  <div>{merah? <span style={{background:'#dc2626', color:'white', padding:'4px 10px', borderRadius:20, fontWeight:'bold', fontSize:11}}>🔴 3H+</span> : <span style={{background:'#16a34a', color:'white', padding:'4px 10px', borderRadius:20, fontSize:11}}>✅ Bagus</span>}</div>
-                </div>
-              )
-            })
-          }
+      <div className="flex gap-2 flex-wrap mb-3">
+        {filters.map(f => (
+          <button
+            key={f.key}
+            onClick={() => setFilter(f.key)}
+            className={`px-3 py-1.5 rounded-full text-sm border transition
+              ${filter === f.key ? 'bg-blue-600 text-white border-blue-600' : 'bg-white hover:bg-gray-100'}`}
+          >
+            {f.label} ({f.count ?? 0})
+          </button>
+        ))}
+      </div>
+
+      <div className="flex gap-2 mb-4">
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Cari tanggal / node / RFO..."
+          className="flex-1 px-3 py-2 border rounded-lg text-sm"
+        />
+        <div className="px-3 py-2 bg-white border rounded-lg text-sm">
+          Total: {filteredData.length}
         </div>
       </div>
-    </div>
-  )
-}
+
+      {loading ? (
+        <div className="text-center py-10">Loading...</div>
+      ) : (
+        <div className="bg-white rounded-xl shadow overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-100 text-left">
+                <tr>
+                  <th className="p-2 whitespace-nowrap">Tanggal</th>
+                  <th className="p-2">Node / Pos</th>
+                  <th className="p-2">Link</th>
+                  <th className="p-2">KENDALA / RFO</th>
+                  <th className="p-2">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredData.map((row, idx) => {
+                  const merah = is3HPlus(row);
+                  return (
+                    <tr key={idx} className={idx % 2 === 0 ? 'bg-yellow-50' : 'bg-white'}>
+                      <td className="p-2 whitespace-nowrap align-top">{row.Tanggal}</td>
+                      <td className="p-2 font-semibold align-top">
+                        {row["Node/Pos"]}
+                      </td>
+                      <td className="p-2 align-top">{row.LINK || 'Icon'}</td>
+                      <td className="p-2 align-top whitespace-pre-wrap">
+                        {row.KENDALA}
+                      </td>
+                      <td className="p-2 align-top">
+                        {merah ? (
+                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded
