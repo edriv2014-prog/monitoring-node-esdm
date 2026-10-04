@@ -15,7 +15,8 @@ export default function App(){
   useEffect(()=>{
     alert(`${API_URL}?gid=${GID}&filter=semua`);
     fetch(`${API_URL}?gid=${GID}&filter=semua`).then(r=>r.json()).then(j=>{
-      console.log(j.data);
+      alert("sdsdsd")
+      //console.log(j.data);
       setRaw(j.data||[]); setStats(j);
       const days=[...new Set((j.data||[]).map(d=>toDay(d.Tanggal)).filter(Boolean))].sort().reverse();
       if(days[0]) setPatokan(days[0]); setLoading(false);
