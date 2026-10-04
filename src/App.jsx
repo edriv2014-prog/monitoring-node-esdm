@@ -13,6 +13,7 @@ export default function App(){
   const [patokan,setPatokan]=useState(''); const [search,setSearch]=useState(''); const [loading,setLoading]=useState(true);
 
   useEffect(()=>{
+    alert(`${API_URL}?gid=${GID}&filter=semua`);
     fetch(`${API_URL}?gid=${GID}&filter=semua`).then(r=>r.json()).then(j=>{
       setRaw(j.data||[]); setStats(j);
       const days=[...new Set((j.data||[]).map(d=>toDay(d.Tanggal)).filter(Boolean))].sort().reverse();
