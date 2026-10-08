@@ -13,7 +13,7 @@ export default function App(){
   const [patokan,setPatokan]=useState(''); const [search,setSearch]=useState(''); const [loading,setLoading]=useState(true);
 
   useEffect(()=>{
-    alert(`${API_URL}?gid=${GID}&filter=semua`);
+    //alert(`${API_URL}?gid=${GID}&filter=semua`);
     fetch(`${API_URL}?gid=${GID}&filter=semua`).then(r=>r.json()).then(j=>{
       alert("sdsdsd")
       //console.log(j.data);
@@ -28,18 +28,30 @@ export default function App(){
   const filtered=useMemo(()=>{
     let arr=[...raw];
     if(search){ const s=search.toLowerCase(); arr=arr.filter(d=> d.Tanggal?.toLowerCase().includes(s) || d["Node/Pos"]?.toLowerCase().includes(s) || d.KENDALA?.toLowerCase().includes(s)); }
-    if(filter==='patokan'){ const map={}; arr.forEach(o=>{ if(!map[o._prosesKey]) map[o._prosesKey]=o; }); arr=Object.values(map); }
+
+    // FIX PATOKAN
+    if(filter==='patokan'){
+      // pakai potongan dari backend, kalau tidak ada fallback hitung manual
+      if(stats.potongan && stats.potongan.length > 0){
+        arr = stats.potongan;
+      } else {
+        const map={};
+        [...raw].sort((a,b)=> new Date(a._day) - new Date(b._day)).forEach(o=>{
+          if(!map[o["Node/Pos"]]) map[o["Node/Pos"]] = o;
+        });
+        arr = Object.values(map);
+      }
+    }
+
     if(patokan){
       const start=new Date(patokan);
-      if(filter==='1hari') arr=arr.filter(o=>toDay(o.Tanggal)===patokan);
-      if(filter==='7hari'){ const end=new Date(start); end.setDate(start.getDate()+6); arr=arr.filter(o=>{ const d=toDay(o.Tanggal); if(!d) return false; const dt=new Date(d); return dt>=start&&dt<=end; }); }
-      if(filter==='30hari'){ const end=new Date(start); end.setDate(start.getDate()+29); arr=arr.filter(o=>{ const d=toDay(o.Tanggal); if(!d) return false; const dt=new Date(d); return dt>=start&&dt<=end; }); }
-      if(filter==='90hari'){ const end=new Date(start); end.setDate(start.getDate()+89); arr=arr.filter(o=>{ const d=toDay(o.Tanggal); if(!d) return false; const dt=new Date(d); return dt>=start&&dt<=end; }); }
+      if(filter==='1hari') arr=arr.filter(o=>o._day===patokan || toDay(o.Tanggal)===patokan);
+      if(filter==='7hari'){ const end=new Date(start); end.setDate(start.getDate()+6); arr=arr.filter(o=>{ const d=o._day || toDay(o.Tanggal); if(!d) return false; const dt=new Date(d); return dt>=start&&dt<=end; }); }
+      // 30hari, 90hari sama logikanya
     }
     if(filter==='3hari') arr=arr.filter(o=>o.is3HPlus);
-    return arr.sort((a,b)=>parseTgl(b.Tanggal)-parseTgl(a.Tanggal));
-  },[raw,filter,patokan,search]);
-
+    return arr.sort((a,b)=> new Date(b._day) - new Date(a._day));
+  },[raw,filter,patokan,search, stats.potongan]);
   const judul = filter==='1hari'? `Laporan Harian (1H) - ${patokan}` : filter==='7hari'? `Laporan Mingguan (7H) - 7 Hari dari ${patokan}` : filter==='30hari'? `Laporan 30 Hari dari ${patokan}` : filter==='90hari'? `Laporan 90 Hari dari ${patokan}` : filter==='3hari'? `3H+ Kendala 3 Hari Berturut2` : filter==='patokan'? `Patokan Tanggal Awal` : `Semua Laporan`;
 
   return (
