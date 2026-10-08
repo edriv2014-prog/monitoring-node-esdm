@@ -45,9 +45,9 @@ export default function App(){
 const filtered = useMemo(()=>{
   let arr = [...raw]
 
-  if(filter === '1hari' && patokan){
-    // FIX 1H: cuma tanggal itu saja, jangan range
-    arr = arr.filter(o => o._day === patokan)
+  if(filter === '1hari' || filter === 'Laporan Harian (1H)'){
+    // CUMA tanggal yang dipilih, bukan 2 hari
+    arr = raw.filter(o => o._day === patokan)
   }
 
   if(filter === '7hari' && patokan){
