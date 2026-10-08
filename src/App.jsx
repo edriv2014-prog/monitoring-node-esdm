@@ -5,7 +5,24 @@ const GID = import.meta.env.VITE_GID || "285923348";
 const API_URL=`${BACKEND}/api/data`;
 
 const bulan={Jan:0,Feb:1,Mar:2,Apr:3,Mei:4,May:4,Jun:5,Jul:6,Agu:7,Aug:7,Sep:8,Okt:9,Oct:9,Nov:10,Des:11,Dec:11};
-const toDay=s=>{const m=s.match(/(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})/); return m? new Date(+m[3],bulan[m[2]]??0,+m[1]).toISOString().slice(0,10):null;}
+ = (s)=>{
+  if(!s) return null
+  s = s.toString().trim()
+  const bulan = {Jan:'01',Feb:'02',Mar:'03',Apr:'04',Mei:'05',May:'05',Jun:'06',Jul:'07',Agu:'08',Aug:'08',Sep:'09',Okt:'10',Oct:'10',Nov:'11',Des:'12',Dec:'12'}
+
+  let m = s.match(/(\d{1,2})-([A-Za-z]{3})-(\d{2,4})/)
+  if(m){
+    let y = +m[3]; if(y<100) y+=2000
+    return `${y}-${bulan[m[2]]}-${String(m[1]).padStart(2,'0')}`
+  }
+  // 31 Agu 2026
+  m = s.match(/(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})/)
+  if(m){
+    return `${m[3]}-${bulan[m[2]]}-${String(m[1]).padStart(2,'0')}`
+  }
+  return null
+}
+
 const parseTgl=s=>{const m=s.match(/(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})/); return m? new Date(+m[3],bulan[m[2]]??0,+m[1]):new Date(0);};
 
 export default function App(){
@@ -25,33 +42,36 @@ export default function App(){
 
   const allDays=useMemo(()=>[...new Set(raw.map(d=>toDay(d.Tanggal)).filter(Boolean))].sort().reverse(),[raw]);
 
-  const filtered=useMemo(()=>{
-    let arr=[...raw];
-    if(search){ const s=search.toLowerCase(); arr=arr.filter(d=> d.Tanggal?.toLowerCase().includes(s) || d["Node/Pos"]?.toLowerCase().includes(s) || d.KENDALA?.toLowerCase().includes(s)); }
+const filtered = useMemo(()=>{
+  let arr = [...raw]
 
-    // FIX PATOKAN
-    if(filter==='patokan'){
-      // pakai potongan dari backend, kalau tidak ada fallback hitung manual
-      if(stats.potongan && stats.potongan.length > 0){
-        arr = stats.potongan;
-      } else {
-        const map={};
-        [...raw].sort((a,b)=> new Date(a._day) - new Date(b._day)).forEach(o=>{
-          if(!map[o["Node/Pos"]]) map[o["Node/Pos"]] = o;
-        });
-        arr = Object.values(map);
-      }
-    }
+  if(filter === '1hari' && patokan){
+    // FIX 1H: cuma tanggal itu saja, jangan range
+    arr = arr.filter(o => o._day === patokan)
+  }
 
-    if(patokan){
-      const start=new Date(patokan);
-      if(filter==='1hari') arr=arr.filter(o=>o._day===patokan || toDay(o.Tanggal)===patokan);
-      if(filter==='7hari'){ const end=new Date(start); end.setDate(start.getDate()+6); arr=arr.filter(o=>{ const d=o._day || toDay(o.Tanggal); if(!d) return false; const dt=new Date(d); return dt>=start&&dt<=end; }); }
-      // 30hari, 90hari sama logikanya
-    }
-    if(filter==='3hari') arr=arr.filter(o=>o.is3HPlus);
-    return arr.sort((a,b)=> new Date(b._day) - new Date(a._day));
-  },[raw,filter,patokan,search, stats.potongan]);
+  if(filter === '7hari' && patokan){
+    const start = new Date(patokan)
+    const end = new Date(start); end.setDate(start.getDate()+6)
+    arr = arr.filter(o=>{
+      const d = new Date(o._day)
+      return d >= start && d <= end
+    })
+  }
+
+  if(filter === 'patokan'){
+    const map = {}
+    ;[...raw].sort((a,b)=> new Date(a._day) - new Date(b._day)).forEach(o=>{
+      if(!map[o["Node/Pos"]]) map[o["Node/Pos"]] = o
+    })
+    arr = Object.values(map)
+  }
+
+  if(filter === '3hari') arr = arr.filter(o=>o.is3HPlus)
+
+  return arr
+},[raw, filter, patokan])
+  
   const judul = filter==='1hari'? `Laporan Harian (1H) - ${patokan}` : filter==='7hari'? `Laporan Mingguan (7H) - 7 Hari dari ${patokan}` : filter==='30hari'? `Laporan 30 Hari dari ${patokan}` : filter==='90hari'? `Laporan 90 Hari dari ${patokan}` : filter==='3hari'? `3H+ Kendala 3 Hari Berturut2` : filter==='patokan'? `Patokan Tanggal Awal` : `Semua Laporan`;
 
   return (
