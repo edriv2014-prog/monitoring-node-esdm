@@ -9,6 +9,7 @@ const toDay=s=>{const m=s.match(/(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})/); return m
 const parseTgl=s=>{const m=s.match(/(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})/); return m? new Date(+m[3],bulan[m[2]]??0,+m[1]):new Date(0);};
 
 export default function App(){
+  alert("sasa")
   const [raw,setRaw]=useState([]); const [stats,setStats]=useState({}); const [filter,setFilter]=useState('semua');
   const [patokan,setPatokan]=useState(''); const [search,setSearch]=useState(''); const [loading,setLoading]=useState(true);
 
