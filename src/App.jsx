@@ -1,88 +1,111 @@
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(200).end();
+import { useEffect, useMemo, useState } from 'react';
+const BACKEND = import.meta.env.VITE_BACKEND_URL || "https://monitoring-node-esdm-api.vercel.app/api";
+const GID = import.meta.env.VITE_GID || "285923348";
 
-  try {
-    const gid=req.query.gid||'285923348';
-    let csvUrl=process.env.SHEET_CSV_URL||'';
-    if(!csvUrl) throw new Error('SHEET_CSV_URL kosong');
-    if(csvUrl.includes('/edit')){
-      const m=csvUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-      if(m) csvUrl=`https://docs.google.com/spreadsheets/d/${m[1]}/export?format=csv&gid=${gid}`;
+const API_URL=`${BACKEND}/api/data`;
+
+const bulan={Jan:0,Feb:1,Mar:2,Apr:3,Mei:4,May:4,Jun:5,Jul:6,Agu:7,Aug:7,Sep:8,Okt:9,Oct:9,Nov:10,Des:11,Dec:11};
+const toDay=s=>{const m=s.match(/(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})/); return m? new Date(+m[3],bulan[m[2]]??0,+m[1]).toISOString().slice(0,10):null;}
+const parseTgl=s=>{const m=s.match(/(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})/); return m? new Date(+m[3],bulan[m[2]]??0,+m[1]):new Date(0);};
+
+export default function App(){
+  const [raw,setRaw]=useState([]); const [stats,setStats]=useState({}); const [filter,setFilter]=useState('semua');
+  const [patokan,setPatokan]=useState(''); const [search,setSearch]=useState(''); const [loading,setLoading]=useState(true);
+
+  useEffect(()=>{
+    //alert(`${API_URL}?gid=${GID}&filter=semua`);
+    fetch(`${API_URL}?gid=${GID}&filter=semua`).then(r=>r.json()).then(j=>{
+      alert("sdsdsd")
+      //console.log(j.data);
+      setRaw(j.data||[]); setStats(j);
+      const days=[...new Set((j.data||[]).map(d=>toDay(d.Tanggal)).filter(Boolean))].sort().reverse();
+      if(days[0]) setPatokan(days[0]); setLoading(false);
+    });
+  },[]);
+
+  const allDays=useMemo(()=>[...new Set(raw.map(d=>toDay(d.Tanggal)).filter(Boolean))].sort().reverse(),[raw]);
+
+  const filtered=useMemo(()=>{
+    let arr=[...raw];
+    if(search){ const s=search.toLowerCase(); arr=arr.filter(d=> d.Tanggal?.toLowerCase().includes(s) || d["Node/Pos"]?.toLowerCase().includes(s) || d.KENDALA?.toLowerCase().includes(s)); }
+    if(filter==='patokan'){ const map={}; arr.forEach(o=>{ if(!map[o._prosesKey]) map[o._prosesKey]=o; }); arr=Object.values(map); }
+    if(patokan){
+      const start=new Date(patokan);
+      if(filter==='1hari') arr=arr.filter(o=>toDay(o.Tanggal)===patokan);
+      if(filter==='7hari'){ const end=new Date(start); end.setDate(start.getDate()+6); arr=arr.filter(o=>{ const d=toDay(o.Tanggal); if(!d) return false; const dt=new Date(d); return dt>=start&&dt<=end; }); }
+      if(filter==='30hari'){ const end=new Date(start); end.setDate(start.getDate()+29); arr=arr.filter(o=>{ const d=toDay(o.Tanggal); if(!d) return false; const dt=new Date(d); return dt>=start&&dt<=end; }); }
+      if(filter==='90hari'){ const end=new Date(start); end.setDate(start.getDate()+89); arr=arr.filter(o=>{ const d=toDay(o.Tanggal); if(!d) return false; const dt=new Date(d); return dt>=start&&dt<=end; }); }
     }
-    if(!csvUrl.includes('gid=')) csvUrl+=(csvUrl.includes('?')?'&':'?')+`gid=${gid}&single=true`;
+    if(filter==='3hari') arr=arr.filter(o=>o.is3HPlus);
+    return arr.sort((a,b)=>parseTgl(b.Tanggal)-parseTgl(a.Tanggal));
+  },[raw,filter,patokan,search]);
 
-    const r = await fetch(csvUrl);
-    if(!r.ok) throw new Error('Gagal fetch sheet: ' + r.status);
-    const csv = await r.text();
+  const judul = filter==='1hari'? `Laporan Harian (1H) - ${patokan}` : filter==='7hari'? `Laporan Mingguan (7H) - 7 Hari dari ${patokan}` : filter==='30hari'? `Laporan 30 Hari dari ${patokan}` : filter==='90hari'? `Laporan 90 Hari dari ${patokan}` : filter==='3hari'? `3H+ Kendala 3 Hari Berturut2` : filter==='patokan'? `Patokan Tanggal Awal` : `Semua Laporan`;
 
-    function parseCSV(text){
-      const rows=[]; let curRow=[]; let cur=''; let inQuote=false;
-      for(let i=0;i<text.length;i++){
-        const c=text[i]; const next=text[i+1];
-        if(c=='"'){ if(inQuote && next=='"'){ cur+='"'; i++; } else inQuote=!inQuote; }
-        else if(c==',' &&!inQuote){ curRow.push(cur); cur=''; }
-        else if((c=='\n' || c=='\r') &&!inQuote){ if(c=='\r' && next=='\n') i++; curRow.push(cur); rows.push(curRow); curRow=[]; cur=''; }
-        else cur+=c;
-      }
-      if(cur || curRow.length){ curRow.push(cur); rows.push(curRow); }
-      return rows;
-    }
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-black text-white">
+      {/* HEADER GENJRENG */}
+      <div className="sticky top-0 z-10 backdrop-blur-xl bg-black/60 border-b border-white/10 p-4">
+        <div className="flex flex-wrap gap-3 items-center justify-between">
+          <h1 className="text-xl font-black tracking-tight bg-gradient-to-r from-yellow-300 to-orange-500 bg-clip-text text-transparent">ESDM MONITORING DASHBOARD</h1>
+          <div className="flex gap-2 flex-wrap">
+            <div className="px-4 py-2 rounded-xl bg-gradient-to-br from-white to-slate-200 text-black font-bold shadow-lg">Total: {raw.length}</div>
+            <div className="px-4 py-2 rounded-xl bg-gradient-to-br from-emerald-400 to-green-600 text-white font-bold shadow-lg shadow-green-500/30">☑ Bagus: {raw.length-(stats.total3H||0)}</div>
+            <div className="px-4 py-2 rounded-xl bg-gradient-to-br from-red-500 to-orange-600 text-white font-bold shadow-lg shadow-red-500/30 animate-pulse">🔥 3H+: {stats.total3H||0} baris / {stats.count3hari||0} Node</div>
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2 items-center">
+          <span className="text-xs text-white/60">Patokan:</span>
+          <input type="date" value={patokan} onChange={e=>setPatokan(e.target.value)} className="bg-white/10 border border-white/20 px-3 py-1.5 rounded-lg text-sm" />
+          <select value={patokan} onChange={e=>setPatokan(e.target.value)} className="bg-white/10 border border-white/20 px-3 py-1.5 rounded-lg text-sm">
+            {allDays.map(d=><option key={d} value={d} className="text-black">{d}</option>)}
+          </select>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Cari Pos PGA / RFO / km..." className="bg-white/10 border border-white/20 px-4 py-1.5 rounded-full text-sm w-64 ml-auto" />
+        </div>
+      </div>
 
-    const allRows = parseCSV(csv).filter(row => row.join('').trim()!== '');
-    const dataRows = allRows.slice(2);
+      {/* FILTER BUTTON GENJRENG */}
+      <div className="p-3 flex flex-wrap gap-2 bg-gradient-to-r from-slate-900 to-black border-b border-white/5">
+        {[
+          {k:'semua', l:`Semua`, c:'from-slate-600 to-slate-700', count:raw.length},
+          {k:'patokan', l:`Patokan Tanggal Awal`, c:'from-blue-600 to-indigo-600', count:stats.totalPotongan||0},
+          {k:'1hari', l:`Laporan Harian (1H)`, c:'from-cyan-500 to-blue-500', count:filter==='1hari'?filtered.length:''},
+          {k:'7hari', l:`Laporan Mingguan (7H)`, c:'from-violet-500 to-purple-600', count:filter==='7hari'?filtered.length:''},
+          {k:'30hari', l:`Laporan 30 Hari`, c:'from-fuchsia-500 to-pink-600', count:filter==='30hari'?filtered.length:''},
+          {k:'90hari', l:`Laporan 90 Hari`, c:'from-orange-500 to-red-500', count:filter==='90hari'?filtered.length:''},
+          {k:'3hari', l:`3H+ Kendala 3 Hari`, c:'from-red-600 to-red-800', count:stats.total3H||0},
+        ].map(f=>(
+          <button key={f.k} onClick={()=>setFilter(f.k)} className={`px-4 py-2 rounded-full text-xs font-bold transition-all border ${filter===f.k? `bg-gradient-to-br ${f.c} text-white border-white/30 scale-105 shadow-lg` : 'bg-white/5 border-white/10 hover:bg-white/10 text-white/70'}`}>
+            {f.l} {f.count? `(${f.count})` : ''}
+          </button>
+        ))}
+      </div>
 
-    const bulan = {Jan:0,Feb:1,Mar:2,Apr:3,Mei:4,May:4,Jun:5,Jul:6,Agu:7,Aug:7,Sep:8,Okt:9,Oct:9,Nov:10,Des:11,Dec:11};
-    const toDay = (s)=>{
-      if(!s) return null;
-      s=s.toString().trim();
-      let m=s.match(/(\d{1,2})-([A-Za-z]{3})-(\d{2,4})/);
-      if(m){ let y=+m[3]; if(y<100) y+=2000; return new Date(Date.UTC(y, bulan[m[2]]??0, +m[1])).toISOString().slice(0,10); }
-      m=s.match(/(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})/);
-      if(!m) return null;
-      return new Date(Date.UTC(+m[3], bulan[m[2]]??0, +m[1])).toISOString().slice(0,10);
-    };
+      <div className="px-4 py-2 text- text-white/40">{judul} | Hasil: {filtered.length} | Patokan: {patokan}</div>
 
-    let lastTgl=''; let raw=[];
-    for(let i=0;i<dataRows.length;i++){
-      const cols=dataRows[i];
-      const get=(idx)=>(cols[idx]||'').toString().trim();
-      let tgl=get(0)||lastTgl; if(tgl) lastTgl=tgl; if(!tgl) continue;
-      const detail=get(4)||''; if(!detail) continue;
-
-      // FIX UTAMA: Pisah per nomor saja, JANGAN pisah per baris \n
-      // 1 Pos = 1 chunk utuh berisi Nama + Duration + RFO
-      const chunks = detail.split(/\n\s*\d+\.\s+/);
-      // chunk pertama masih ada "1. " di depan, bersihkan
-      const cleanChunks = chunks.map(c=>c.replace(/^\s*\d+\.\s+/,'').trim()).filter(Boolean);
-
-      cleanChunks.forEach(full=>{
-        if(!full) return;
-        // Node/Pos = ambil sampai sebelum kata Duration
-        const durPos = full.search(/\s*Duration\s*:/i);
-        let nodeName = durPos > 0? full.substring(0, durPos).trim() : full.split('\n')[0].trim();
-
-        raw.push({
-          Tanggal: tgl,
-          "Node/Pos": nodeName,
-          LINK: 'Icon',
-          KENDALA: full, // ini yang bener, full Duration + RFO
-          _day: toDay(tgl),
-          _prosesKey: nodeName+'|'+tgl
-        });
-      });
-    }
-
-    // 3H+
-    const byNode={}; raw.forEach(o=>{ if(!byNode[o["Node/Pos"]]) byNode[o["Node/Pos"]]=new Set(); if(o._day) byNode[o["Node/Pos"]].add(o._day); });
-    const is3H=(node,day)=>{ const days=[...(byNode[node]||[])].sort(); const idx=days.indexOf(day); if(idx<2) return false; const d1=new Date(days[idx-2]),d2=new Date(days[idx-1]),d3=new Date(days[idx]); return (d2-d1===86400000)&&(d3-d2===86400000); };
-    const data=raw.map(o=>({...o, is3HPlus:is3H(o["Node/Pos"],o._day)}));
-
-    const potonganMap={}; [...data].sort((a,b)=>new Date(a._day)-new Date(b._day)).forEach(o=>{ if(!potonganMap[o["Node/Pos"]]) potonganMap[o["Node/Pos"]]=o; });
-
-    res.setHeader('Cache-Control','s-maxage=60, stale-while-revalidate=300');
-    return res.status(200).json({ data, potongan:Object.values(potonganMap), total:data.length, url:csvUrl });
-  } catch(e){ return res.status(200).json({data:[], error:e.message, total:0}); }
+      {/* TABLE GENJRENG */}
+      <div className="p-3">
+        <div className="rounded-2xl overflow-hidden border border-white/10 bg-white/5 backdrop-blur shadow-2xl">
+          <div className="overflow-auto max-h-">
+            <table className="w-full text-sm">
+              <thead className="bg-white/10 sticky top-0 backdrop-blur">
+                <tr className="text-white/70 text-xs uppercase tracking-widest"><th className="p-3 text-left">Tanggal</th><th className="p-3 text-left">Node/Pos</th><th className="p-3 text-left">LINK</th><th className="p-3 text-left">KENDALA</th><th className="p-3 text-left">STATUS</th></tr>
+              </thead>
+              <tbody>
+                {filtered.map((row,i)=>(
+                  <tr key={i} className={`border-b border-white/5 hover:bg-white/10 transition ${row.is3HPlus?'bg-red-500/10':''}`}>
+                    <td className="p-3 align-top whitespace-nowrap text-yellow-200 font-bold">{row.Tanggal}</td>
+                    <td className="p-3 align-top font-black text-white">{row["Node/Pos"]}</td>
+                    <td className="p-3 align-top"><span className="px-2 py-1 rounded bg-white/10 text-">{row.LINK}</span></td>
+                    <td className="p-3 align-top text-white/80 whitespace-pre-wrap leading-relaxed max-w-">{row.KENDALA}</td>
+                    <td className="p-3 align-top">{row.is3HPlus? <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gradient-to-br from-red-500 to-orange-600 text-white text-xs font-bold shadow">🔥 3H+ MERAH</span> : <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gradient-to-br from-emerald-400 to-green-600 text-white text-xs font-bold">☑ Bagus</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
