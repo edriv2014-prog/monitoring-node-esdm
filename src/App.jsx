@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 const BACKEND = import.meta.env.VITE_BACKEND_URL || "https://monitoring-node-esdm-api.vercel.app/api";
 const GID = import.meta.env.VITE_GID || "285923348";
-const cleanNode = (s) => {
-  if (!s) return '';
-  return String(s).replace(/^\s*\d+[\s\.\-\)]+/g, '').trim();
-};
+const cleanNode = (s) => String(s||'').replace(/^\s*\d+[^A-Za-z0-9]*/g,'').trim();
+
+
 
 const API_URL=`${BACKEND}/api/data`;
 
