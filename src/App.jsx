@@ -1,15 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
 const BACKEND = import.meta.env.VITE_BACKEND_URL || "https://monitoring-node-esdm-api.vercel.app/api";
 const GID = import.meta.env.VITE_GID || "285923348";
-const cleanNode = (s) => String(s||'').replace(/^\s*\d+[^A-Za-z0-9]*/g,'').trim();
 
-
+// NUKLIR - HAPUS APAPUN DI DEPAN SAMPAI KETEMU HURUF
+const cleanNode = (s) => {
+  let v = String(s||'');
+  v = v.replace(/^\s*[\d\.\-\)\:\s\u00A0\xA0]+/g, '').trim();
+  v = v.replace(/^\d+\W+/g, '').trim();
+  const m = v.match(/[A-Za-z].*/s);
+  return m ? m[0].split('\n')[0].trim() : v.split('\n')[0].trim();
+};
 
 const API_URL=`${BACKEND}/api/data`;
-
 const bulan={Jan:0,Feb:1,Mar:2,Apr:3,Mei:4,May:4,Jun:5,Jul:6,Agu:7,Aug:7,Sep:8,Okt:9,Oct:9,Nov:10,Des:11,Dec:11};
-const toDay=s=>{const m=s.match(/(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})/); return m? new Date(+m[3],bulan[m[2]]??0,+m[1]).toISOString().slice(0,10):null;}
-const parseTgl=s=>{const m=s.match(/(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})/); return m? new Date(+m[3],bulan[m[2]]??0,+m[1]):new Date(0);};
+const toDay=s=>{const m=s?.match(/(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})/); return m? new Date(+m[3],bulan[m[2]]??0,+m[1]).toISOString().slice(0,10):null;}
+const parseTgl=s=>{const m=s?.match(/(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})/); return m? new Date(+m[3],bulan[m[2]]??0,+m[1]):new Date(0);};
 
 export default function App(){
   const [raw,setRaw]=useState([]); const [stats,setStats]=useState({}); const [filter,setFilter]=useState('semua');
@@ -28,7 +33,7 @@ export default function App(){
   const filtered=useMemo(()=>{
     let arr=[...raw];
     if(search){ const s=search.toLowerCase(); arr=arr.filter(d=> d.Tanggal?.toLowerCase().includes(s) || d["Node/Pos"]?.toLowerCase().includes(s) || d.KENDALA?.toLowerCase().includes(s)); }
-    if(filter==='patokan'){ const map={}; arr.forEach(o=>{ if(!map[o._prosesKey]) map[o._prosesKey]=o; }); arr=Object.values(map); }
+    if(filter==='patokan'){ const map={}; arr.forEach(o=>{ const k=cleanNode(o["Node/Pos"]); if(!map[k]) map[k]=o; }); arr=Object.values(map); }
     if(patokan){
       const start=new Date(patokan);
       if(filter==='1hari') arr=arr.filter(o=>toDay(o.Tanggal)===patokan);
@@ -42,16 +47,17 @@ export default function App(){
 
   const judul = filter==='1hari'? `Laporan Harian (1H) - ${patokan}` : filter==='7hari'? `Laporan Mingguan (7H) - 7 Hari dari ${patokan}` : filter==='30hari'? `Laporan 30 Hari dari ${patokan}` : filter==='90hari'? `Laporan 90 Hari dari ${patokan}` : filter==='3hari'? `3H+ Kendala 3 Hari Berturut2` : filter==='patokan'? `Patokan Tanggal Awal` : `Semua Laporan`;
 
+  if(loading) return <div className="p-10 bg-black text-white">Loading NUKLIR...</div>;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-black text-white">
-      {/* HEADER GENJRENG */}
       <div className="sticky top-0 z-10 backdrop-blur-xl bg-black/60 border-b border-white/10 p-4">
         <div className="flex flex-wrap gap-3 items-center justify-between">
-          <h1 className="text-xl font-black tracking-tight bg-gradient-to-r from-yellow-300 to-orange-500 bg-clip-text text-transparent">ESDM MONITORING DASHBOARD</h1>
+          <h1 className="text-xl font-black tracking-tight bg-gradient-to-r from-yellow-300 to-orange-500 bg-clip-text text-transparent">ESDM MONITORING DASHBOARD <span className="text-[10px] bg-white text-black px-2 py-1 rounded ml-2">vNUKLIR-FIXED</span></h1>
           <div className="flex gap-2 flex-wrap">
-            <div className="px-4 py-2 rounded-xl bg-gradient-to-br from-white to-slate-200 text-black font-bold shadow-lg">Total: {raw.length}</div>
-            <div className="px-4 py-2 rounded-xl bg-gradient-to-br from-emerald-400 to-green-600 text-white font-bold shadow-lg shadow-green-500/30">☑ Bagus: {raw.length-(stats.total3H||0)}</div>
-            <div className="px-4 py-2 rounded-xl bg-gradient-to-br from-red-500 to-orange-600 text-white font-bold shadow-lg shadow-red-500/30 animate-pulse">🔥 3H+: {stats.total3H||0} baris / {stats.count3hari||0} Node</div>
+            <div className="px-4 py-2 rounded-xl bg-white text-black font-bold">Total: {raw.length}</div>
+            <div className="px-4 py-2 rounded-xl bg-gradient-to-br from-emerald-400 to-green-600 text-white font-bold">☑ Bagus: {raw.length-(stats.total3H||0)}</div>
+            <div className="px-4 py-2 rounded-xl bg-gradient-to-br from-red-500 to-orange-600 text-white font-bold animate-pulse">🔥 3H+: {stats.total3H||0} / {stats.count3hari||0}</div>
           </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-2 items-center">
@@ -64,7 +70,6 @@ export default function App(){
         </div>
       </div>
 
-      {/* FILTER BUTTON GENJRENG */}
       <div className="p-3 flex flex-wrap gap-2 bg-gradient-to-r from-slate-900 to-black border-b border-white/5">
         {[
           {k:'semua', l:`Semua`, c:'from-slate-600 to-slate-700', count:raw.length},
@@ -81,12 +86,11 @@ export default function App(){
         ))}
       </div>
 
-      <div className="px-4 py-2 text- text-white/40">{judul} | Hasil: {filtered.length} | Patokan: {patokan}</div>
+      <div className="px-4 py-2 text-white/40">{judul} | Hasil: {filtered.length} | Patokan: {patokan} | Build: vNUKLIR-FIXED</div>
 
-      {/* TABLE GENJRENG */}
       <div className="p-3">
         <div className="rounded-2xl overflow-hidden border border-white/10 bg-white/5 backdrop-blur shadow-2xl">
-          <div className="overflow-auto max-h-">
+          <div className="overflow-auto">
             <table className="w-full text-sm">
               <thead className="bg-white/10 sticky top-0 backdrop-blur">
                 <tr className="text-white/70 text-xs uppercase tracking-widest"><th className="p-3 text-left">Tanggal</th><th className="p-3 text-left">Node/Pos</th><th className="p-3 text-left">LINK</th><th className="p-3 text-left">KENDALA</th><th className="p-3 text-left">STATUS</th></tr>
@@ -96,8 +100,8 @@ export default function App(){
                   <tr key={i} className={`border-b border-white/5 hover:bg-white/10 transition ${row.is3HPlus?'bg-red-500/10':''}`}>
                     <td className="p-3 align-top whitespace-nowrap text-yellow-200 font-bold">{row.Tanggal}</td>
                     <td className="p-3 align-top font-black text-white">{cleanNode(row["Node/Pos"])}</td>
-                    <td className="p-3 align-top"> <span className="px-2 py-1 rounded bg-white/10 text-">{row.LINK}</span></td>
-                    <td className="p-3 align-top text-white/80 whitespace-pre-wrap leading-relaxed max-w-">{row.KENDALA}</td>
+                    <td className="p-3 align-top"> <span className="px-2 py-1 rounded bg-white/10">{row.LINK}</span></td>
+                    <td className="p-3 align-top text-white/80 whitespace-pre-wrap leading-relaxed">{row.KENDALA}</td>
                     <td className="p-3 align-top">{row.is3HPlus? <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gradient-to-br from-red-500 to-orange-600 text-white text-xs font-bold shadow">🔥 3H+ MERAH</span> : <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gradient-to-br from-emerald-400 to-green-600 text-white text-xs font-bold">☑ Bagus</span>}</td>
                   </tr>
                 ))}
