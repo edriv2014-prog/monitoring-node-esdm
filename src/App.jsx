@@ -92,7 +92,7 @@ export default function App(){
                 {filtered.map((row,i)=>(
                   <tr key={i} className={`border-b border-white/5 hover:bg-white/10 transition ${row.is3HPlus?'bg-red-500/10':''}`}>
                     <td className="p-3 align-top whitespace-nowrap text-yellow-200 font-bold">{row.Tanggal}</td>
-                    <td className="p-3 align-top font-black text-white">{row["Node/Pos"]}</td>
+                    <td className="p-3 align-top font-black text-white">{String(row["Node/Pos"]||'').replace(/^\s*\d+\s*[\.\)]\s*/g,'').replace(/^\s*\d+\s+/,'').trim()}</td>
                     <td className="p-3 align-top"><span className="px-2 py-1 rounded bg-white/10 text-">{row.LINK}</span></td>
                     <td className="p-3 align-top text-white/80 whitespace-pre-wrap leading-relaxed max-w-">{row.KENDALA}</td>
                     <td className="p-3 align-top">{row.is3HPlus? <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gradient-to-br from-red-500 to-orange-600 text-white text-xs font-bold shadow">🔥 3H+ MERAH</span> : <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gradient-to-br from-emerald-400 to-green-600 text-white text-xs font-bold">☑ Bagus</span>}</td>
