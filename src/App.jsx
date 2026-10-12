@@ -47,7 +47,7 @@ export default function App(){
 
   const judul = filter==='1hari'? `Laporan Harian (1H) - ${patokan}` : filter==='7hari'? `Laporan Mingguan (7H) - 7 Hari dari ${patokan}` : filter==='30hari'? `Laporan 30 Hari dari ${patokan}` : filter==='90hari'? `Laporan 90 Hari dari ${patokan}` : filter==='3hari'? `3H+ Kendala 3 Hari Berturut2` : filter==='patokan'? `Patokan Tanggal Awal` : `Semua Laporan`;
 
-  if(loading) return <div className="p-10 bg-black text-white">Loading NUKLIR...</div>;
+  if(loading) return <div className="p-10 bg-black text-white">Loading Monitoring Node...</div>;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-black text-white">
