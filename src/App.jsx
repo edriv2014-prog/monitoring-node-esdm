@@ -3,7 +3,7 @@ const BACKEND = import.meta.env.VITE_BACKEND_URL || "https://monitoring-node-esd
 const GID = import.meta.env.VITE_GID || "285923348";
 const cleanNode = (s) => {
   if (!s) return '';
-  alert(s)
+  alert(String(s).replace(/^\s*\d+\s*[\.\)]\s*/g, '').replace(/^\s*\d+\s+/g, '').trim())
   return String(s).replace(/^\s*\d+\s*[\.\)]\s*/g, '').replace(/^\s*\d+\s+/g, '').trim();
 };
 
