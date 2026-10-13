@@ -40,7 +40,7 @@ export default function App(){
     e.preventDefault(); setLoadingLogin(true);
     const {data,error}=await supabase.from('users').select('*').eq('username',loginForm.username).eq('password',loginForm.password).single();
     const {data2,error2}=await supabase.from('users').select('*')
-    console.log("data2",data2)
+    console.log("error2",error2)
     setLoadingLogin(false);
     if(error||!data){ alert('Login gagal! User: superadmin / Pass: esdm2026. Pastikan tabel users sudah ada di Supabase!'); return; }
     localStorage.setItem('esdm_user', JSON.stringify(data)); setUser(data); setMenu('icon');
