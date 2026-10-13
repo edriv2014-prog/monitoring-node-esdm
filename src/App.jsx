@@ -20,6 +20,7 @@ export default function App(){
   const [usersList,setUsersList]=useState([]); const [editUser,setEditUser]=useState(null);
   const [formUser,setFormUser]=useState({username:'',email:'',password:'',role:'Viewer'});
   const [loadingLogin,setLoadingLogin]=useState(false);
+  const [debug,setDebug]=useState('');
 
   const isLogin = !!user;
   const isSuperAdmin = user?.role === 'Super admin';
@@ -36,11 +37,29 @@ export default function App(){
   useEffect(()=>{ if(isLogin) loadUsers(); },[isLogin,menu]);
 
   const handleLogin = async (e)=>{
-    e.preventDefault(); setLoadingLogin(true);
-    const {data,error}=await supabase.from('users').select('*').eq('username',loginForm.username).eq('password',loginForm.password).single();
+    e.preventDefault(); setLoadingLogin(true); setDebug('');
+    try {
+      console.log("SUPABASE URL", import.meta.env.VITE_SUPABASE_URL);
+      console.log("LOGIN ATTEMPT", loginForm.username, loginForm.password);
+      const {data,error}=await supabase.from('users').select('*').eq('username',loginForm.username).eq('password',loginForm.password).single();
+      console.log("SUPABASE RESULT", data, error);
+      if(error){
+        setDebug(`ERROR SUPABASE: ${error.message} | Code: ${error.code} | Hint: Cek RLS / Env Vercel`);
+        alert(`Login gagal! ERROR: ${error.message}\n\nCek: 1. Env VITE_SUPABASE_URL ada? 2. Tabel users ada? 3. RLS dimatikan?`);
+        setLoadingLogin(false);
+        return;
+      }
+      if(!data){
+        setDebug('DATA NULL - user tidak ditemukan');
+        alert('User tidak ditemukan! Cek username/password di tabel users Supabase');
+        setLoadingLogin(false);
+        return;
+      }
+      localStorage.setItem('esdm_user', JSON.stringify(data)); setUser(data); setMenu('icon');
+    } catch(err){
+      console.error(err); setDebug(`EXCEPTION: ${err.message}`); alert(`Exception: ${err.message}`);
+    }
     setLoadingLogin(false);
-    if(error||!data){ alert('Login gagal! Pastikan di Supabase sudah ada tabel users & user superadmin / esdm2026'); return; }
-    localStorage.setItem('esdm_user', JSON.stringify(data)); setUser(data); setMenu('icon');
   };
   const handleLogout=()=>{ localStorage.removeItem('esdm_user'); setUser(null); };
 
@@ -48,20 +67,18 @@ export default function App(){
     e.preventDefault();
     if(!isSuperAdmin) return alert('Hanya Super admin!');
     if(editUser){
-      const {error}=await supabase.from('users').update({username:formUser.username,email:formUser.email,password:formUser.password,role:formUser.role}).eq('id',editUser.id);
-      if(!error){ setEditUser(null); setFormUser({username:'',email:'',password:'',role:'Viewer'}); loadUsers(); }
+      await supabase.from('users').update({username:formUser.username,email:formUser.email,password:formUser.password,role:formUser.role}).eq('id',editUser.id);
+      setEditUser(null); setFormUser({username:'',email:'',password:'',role:'Viewer'}); loadUsers();
     } else {
-      const {error}=await supabase.from('users').insert([{username:formUser.username,email:formUser.email,password:formUser.password,role:formUser.role}]);
-      if(!error){ setFormUser({username:'',email:'',password:'',role:'Viewer'}); loadUsers(); }
+      await supabase.from('users').insert([{username:formUser.username,email:formUser.email,password:formUser.password,role:formUser.role}]);
+      setFormUser({username:'',email:'',password:'',role:'Viewer'}); loadUsers();
     }
   };
 
-  const allDays=useMemo(()=>[...new Set(raw.map(d=>toDay(d.Tanggal)).filter(Boolean))].sort().reverse(),[raw]);
   const filtered=useMemo(()=>{
     let arr=[...raw];
     if(search){ const s=search.toLowerCase(); arr=arr.filter(d=> d.Tanggal?.toLowerCase().includes(s) || d["Node/Pos"]?.toLowerCase().includes(s)); }
     if(filter==='3hari') arr=arr.filter(o=>o.is3HPlus);
-    if(filter==='patokan'){ const map={}; arr.forEach(o=>{ const k=cleanNode(o["Node/Pos"]); if(!map[k]) map[k]=o; }); arr=Object.values(map); }
     return arr.sort((a,b)=>parseTgl(b.Tanggal)-parseTgl(a.Tanggal));
   },[raw,filter,search]);
 
@@ -69,12 +86,15 @@ export default function App(){
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-black flex items-center justify-center p-4">
         <div className="w-full max-w-sm bg-white/10 backdrop-blur border border-white/20 rounded-2xl p-6">
-          <h1 className="text-2xl font-black bg-gradient-to-r from-yellow-300 to-orange-500 bg-clip-text text-transparent mb-6">ESDM LOGIN</h1>
+          <h1 className="text-2xl font-black bg-gradient-to-r from-yellow-300 to-orange-500 bg-clip-text text-transparent mb-1">ESDM LOGIN</h1>
+          <p className="text-white/50 text-xs mb-4">Debug mode - lihat Console F12</p>
           <form onSubmit={handleLogin} className="space-y-3">
-            <input value={loginForm.username} onChange={e=>setLoginForm({...loginForm,username:e.target.value})} placeholder="Username superadmin" className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white"/>
-            <input type="password" value={loginForm.password} onChange={e=>setLoginForm({...loginForm,password:e.target.value})} placeholder="Password esdm2026" className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white"/>
+            <input value={loginForm.username} onChange={e=>setLoginForm({...loginForm,username:e.target.value})} placeholder="Username admin" className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white"/>
+            <input type="password" value={loginForm.password} onChange={e=>setLoginForm({...loginForm,password:e.target.value})} placeholder="Password admin" className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white"/>
             <button disabled={loadingLogin} className="w-full bg-gradient-to-br from-yellow-400 to-orange-600 text-black font-black py-3 rounded-xl">{loadingLogin?'Loading...':'Login Awal'}</button>
           </form>
+          {debug && <div className="mt-3 p-2 bg-red-500/20 border border-red-500/30 text-red-200 text-xs rounded-xl break-words">{debug}</div>}
+          <div className="mt-3 text-[10px] text-white/30 break-all">URL: {import.meta.env.VITE_SUPABASE_URL || 'KOSONG! SET ENV DI VERCEL!'}</div>
         </div>
       </div>
     );
@@ -95,26 +115,17 @@ export default function App(){
       <div className="flex-1 p-4">
         {menu==='users' ? (
           <div className="space-y-4">
-            {isSuperAdmin && (
-              <form onSubmit={handleSaveUser} className="bg-white/5 border border-white/10 rounded-2xl p-4 grid grid-cols-5 gap-2">
-                <input value={formUser.username} onChange={e=>setFormUser({...formUser,username:e.target.value})} placeholder="Username" required className="bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-sm"/>
-                <input value={formUser.email} onChange={e=>setFormUser({...formUser,email:e.target.value})} placeholder="Email" className="bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-sm"/>
-                <input value={formUser.password} onChange={e=>setFormUser({...formUser,password:e.target.value})} placeholder="Password" required className="bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-sm"/>
-                <select value={formUser.role} onChange={e=>setFormUser({...formUser,role:e.target.value})} className="bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-sm"><option>Super admin</option><option>Admin</option><option>Operator</option><option>Viewer</option></select>
-                <button className="bg-white text-black font-bold rounded-xl">{editUser?'Update':'Create'}</button>
-              </form>
-            )}
-            <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
-              <table className="w-full text-sm"><thead className="bg-white/5 text-white/50 text-xs"><tr><th className="p-3 text-left">Username</th><th className="p-3 text-left">Role</th><th className="p-3 text-left">Aksi</th></tr></thead>
-                <tbody>{usersList.map(u=><tr key={u.id} className="border-t border-white/5"><td className="p-3">{u.username}</td><td className="p-3">{u.role}</td><td className="p-3 flex gap-2">{isSuperAdmin&&<><button onClick={()=>{setEditUser(u); setFormUser({username:u.username,email:u.email||'',password:u.password,role:u.role});}} className="px-3 py-1 bg-white/10 rounded-lg text-xs">Edit</button><button onClick={async()=>{if(confirm('Hapus?')){await supabase.from('users').delete().eq('id',u.id); loadUsers();}}} className="px-3 py-1 bg-red-500/20 rounded-lg text-xs">Hapus</button></>}</td></tr>)}</tbody>
-              </table>
-            </div>
+            <form onSubmit={handleSaveUser} className="bg-white/5 border border-white/10 rounded-2xl p-4 grid grid-cols-5 gap-2">
+              <input value={formUser.username} onChange={e=>setFormUser({...formUser,username:e.target.value})} placeholder="Username" required className="bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-sm"/>
+              <input value={formUser.email} onChange={e=>setFormUser({...formUser,email:e.target.value})} placeholder="Email" className="bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-sm"/>
+              <input value={formUser.password} onChange={e=>setFormUser({...formUser,password:e.target.value})} placeholder="Password" required className="bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-sm"/>
+              <select value={formUser.role} onChange={e=>setFormUser({...formUser,role:e.target.value})} className="bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-sm"><option>Super admin</option><option>Admin</option><option>Operator</option><option>Viewer</option></select>
+              <button className="bg-white text-black font-bold rounded-xl">{editUser?'Update':'Create'}</button>
+            </form>
+            <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden"><table className="w-full text-sm"><thead className="bg-white/5 text-white/50 text-xs"><tr><th className="p-3 text-left">Username</th><th className="p-3 text-left">Role</th></tr></thead><tbody>{usersList.map(u=><tr key={u.id} className="border-t border-white/5"><td className="p-3">{u.username}</td><td className="p-3">{u.role}</td></tr>)}</tbody></table></div>
           </div>
         ) : (
-          <div className="rounded-2xl overflow-hidden border border-white/10 bg-white/5">
-            <div className="p-3 flex gap-2"><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Cari..." className="bg-white/10 border border-white/20 px-4 py-1.5 rounded-full text-sm w-64"/><span className="ml-auto text-xs bg-white text-black px-3 py-1 rounded-full">Total {filtered.length} | 3H+ {raw.filter(r=>r.is3HPlus).length}</span></div>
-            <table className="w-full text-sm"><thead className="bg-white/10"><tr className="text-white/60 text-xs uppercase"><th className="p-3 text-left">Tanggal</th><th className="p-3 text-left">Node/Pos</th><th className="p-3 text-left">LINK</th><th className="p-3 text-left">STATUS</th></tr></thead><tbody>{filtered.map((row,i)=><tr key={i} className={`border-b border-white/5 ${row.is3HPlus?'bg-red-500/10':''}`}><td className="p-3 text-yellow-200 text-xs">{row.Tanggal}</td><td className="p-3 font-bold">{cleanNode(row["Node/Pos"])}</td><td className="p-3"><span className="px-2 py-1 rounded bg-white/10 text-xs">{row.LINK}</span></td><td className="p-3">{row.is3HPlus?<span className="px-2 py-1 rounded-full bg-red-500 text-white text-xs">🔥 3H+ MERAH</span>:<span className="px-2 py-1 rounded-full bg-emerald-500 text-white text-xs">☑ Bagus</span>}</td></tr>)}</tbody></table>
-          </div>
+          <div className="rounded-2xl overflow-hidden border border-white/10 bg-white/5"><div className="p-3 flex gap-2"><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Cari..." className="bg-white/10 border border-white/20 px-4 py-1.5 rounded-full text-sm w-64"/><span className="ml-auto text-xs bg-white text-black px-3 py-1 rounded-full">Total {filtered.length} | 3H+ {raw.filter(r=>r.is3HPlus).length}</span></div><table className="w-full text-sm"><thead className="bg-white/10"><tr className="text-white/60 text-xs uppercase"><th className="p-3 text-left">Tanggal</th><th className="p-3 text-left">Node/Pos</th><th className="p-3 text-left">LINK</th><th className="p-3 text-left">STATUS</th></tr></thead><tbody>{filtered.map((row,i)=><tr key={i} className={`border-b border-white/5 ${row.is3HPlus?'bg-red-500/10':''}`}><td className="p-3 text-yellow-200 text-xs">{row.Tanggal}</td><td className="p-3 font-bold">{cleanNode(row["Node/Pos"])}</td><td className="p-3"><span className="px-2 py-1 rounded bg-white/10 text-xs">{row.LINK}</span></td><td className="p-3">{row.is3HPlus?<span className="px-2 py-1 rounded-full bg-red-500 text-white text-xs">🔥 3H+ MERAH</span>:<span className="px-2 py-1 rounded-full bg-emerald-500 text-white text-xs">☑ Bagus</span>}</td></tr>)}</tbody></table></div>
         )}
       </div>
     </div>
