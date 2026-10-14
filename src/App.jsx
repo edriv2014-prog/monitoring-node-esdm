@@ -5,7 +5,43 @@ const BACKEND = (import.meta.env.VITE_BACKEND_URL || "https://monitoring-node-es
 const API_URL = `${BACKEND}/api/data`;
 
 const clean = (s) => String(s||'').replace(/^\s*[\d\.\-\)\:\s\u00A0]+/g,'').trim().split('\n')[0].trim();
-const parseTgl=s=>{const mm={Jan:0,Feb:1,Mar:2,Apr:3,Mei:4,May:4,Jun:5,Jul:6,Agu:7,Aug:7,Sep:8,Okt:9,Oct:9,Nov:10,Des:11,Dec:11}; const m=s?.match(/(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})/); return m? new Date(+m[3],mm[m[2]]??0,+m[1]):new Date(0);};
+
+const parseTgl = s => {
+  const mm={Jan:0,Feb:1,Mar:2,Apr:3,Mei:4,May:4,Jun:5,Jul:6,Agu:7,Aug:7,Sep:8,Okt:9,Oct:9,Nov:10,Des:11,Dec:11};
+  const m=s?.match(/(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})/);
+  return m? new Date(+m[3],mm[m[2]]??0,+m[1]) : null;
+};
+
+// Cek 3 hari berturut-turut beneran
+const check3HariBerturut = (allData) => {
+  const map = {}; // Node -> [Date]
+  allData.forEach(d=>{
+    const t = parseTgl(d.Tanggal);
+    if(!t) return;
+    const key = d["Node/Pos"];
+    if(!map[key]) map[key]=[];
+    // simpan timestamp hari (tanpa jam)
+    const day = new Date(t.getFullYear(), t.getMonth(), t.getDate()).getTime();
+    if(!map[key].includes(day)) map[key].push(day);
+  });
+
+  const result = {};
+  Object.keys(map).forEach(node=>{
+    const days = map[node].sort((a,b)=>a-b);
+    // cek ada 3 hari yang selisih 1 hari terus
+    for(let i=0;i<=days.length-3;i++){
+      const d1 = days[i], d2 = days[i+1], d3 = days[i+2];
+      const oneDay = 24*60*60*1000;
+      if((d2-d1===oneDay) && (d3-d2===oneDay)){
+        result[node]=true;
+        break;
+      }
+      // kalau muncul 3x di hari yang sama beda jam juga anggap 3H+? hapus kalau gak mau
+    }
+  });
+  return result;
+};
+
 
 export default function App(){
   const [raw,setRaw]=useState([]); const [search,setSearch]=useState(''); const [menu,setMenu]=useState('icon'); const [filter,setFilter]=useState('semua');
@@ -30,14 +66,24 @@ export default function App(){
     setRaw([]);
   };
 
-  const filtered=useMemo(()=>{
-    let arr=[...raw];
-    const freq={}; raw.forEach(d=>{ freq[d["Node/Pos"]]=(freq[d["Node/Pos"]]||0)+1; });
-    arr = arr.map(d=>({...d, is3HPlus: freq[d["Node/Pos"]] >= 3 }));
-    if(search){ const s=search.toLowerCase(); arr=arr.filter(d=> JSON.stringify(d).toLowerCase().includes(s)); }
-    if(filter==='3hari') arr=arr.filter(o=>o.is3HPlus);
-    return arr.sort((a,b)=>parseTgl(b.Tanggal)-parseTgl(a.Tanggal));
-  },[raw,search,filter]);
+ DI DALAM COMPONENT ===
+const filtered = useMemo(()=>{
+  let arr=[...raw];
+
+  // INI YANG BENER: 3 hari berturut-turut, bukan cuma 3x muncul
+  const nodes3Hari = check3HariBerturut(raw);
+  arr = arr.map(d=>({...d, is3HPlus:!!nodes3Hari[d["Node/Pos"]] }));
+
+  if(search){ const s=search.toLowerCase(); arr=arr.filter(d=> JSON.stringify(d).toLowerCase().includes(s)); }
+  if(filter==='3hari') arr=arr.filter(o=>o.is3HPlus);
+  return arr.sort((a,b)=>(parseTgl(b.Tanggal)?.getTime()||0)-(parseTgl(a.Tanggal)?.getTime()||0));
+},[raw,search,filter]);
+
+// Untuk hitung badge 3H+ di atas
+const count3H = useMemo(()=>{
+  const nodes = check3HariBerturut(raw);
+  return raw.filter(r=>nodes[r["Node/Pos"]]).length;
+},[raw]);
 
   if(!user) return (
     <div style={{minHeight:'100vh',background:'#0f172a',display:'flex',alignItems:'center',justifyContent:'center'}}>
