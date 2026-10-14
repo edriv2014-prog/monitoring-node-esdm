@@ -1,18 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from './supabaseClient';
 
-const BACKEND = (import.meta.env.VITE_BACKEND_URL || "https://monitoring-node-esdm-api.vercel.app").replace(/\/api\/?$/,'');
-const API_URL = `${BACKEND}/api/data`;
+// PAKAI INTERNAL API GAMMA SENDIRI - JANGAN EXTERNAL LAGI
+const API_URL = `/api/data`;
 
 const clean = (s) => String(s||'').replace(/^\s*[\d\.\-\)\:\s\u00A0]+/g,'').trim().split('\n')[0].trim();
 
 const parseTgl = s => {
   const mm={Jan:0,Feb:1,Mar:2,Apr:3,Mei:4,May:4,Jun:5,Jul:6,Agu:7,Aug:7,Sep:8,Okt:9,Oct:9,Nov:10,Des:11,Dec:11};
   const m=s?.match(/(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})/);
-  return m? new Date(+m[3], mm[m[2]]??0, +m[1]) : null;
+  if(!m) return null;
+  return new Date(+m[3], mm[m[2]]??0, +m[1]);
 };
 
-// 3 HARI BERTURUT BENERAN: 11,12,13 Okt
+// LOGIC BENER: 3 HARI BERTURUT = 11,12,13 OKT HARUS ADA SEMUA
 const check3HariBerturut = (allData) => {
   const map = {};
   allData.forEach(d=>{
@@ -29,7 +30,8 @@ const check3HariBerturut = (allData) => {
     for(let i=0;i<=days.length-3;i++){
       const oneDay = 86400000;
       if(days[i+1]-days[i]===oneDay && days[i+2]-days[i+1]===oneDay){
-        merah[node]=true; break;
+        merah[node]=true;
+        break;
       }
     }
   });
@@ -41,21 +43,31 @@ export default function App(){
   const [search,setSearch]=useState('');
   const [menu,setMenu]=useState('icon');
   const [filter,setFilter]=useState('semua');
-  const [user,setUser]=useState(()=>{ try{ return JSON.parse(localStorage.getItem('esdm_user')||'null'); }catch{ return null; }});
+  const [loading,setLoading]=useState(false);
+  const [user,setUser]=useState(()=>{
+    try{ return JSON.parse(localStorage.getItem('esdm_user')||'null'); }catch{ return null; }
+  });
   const [loginForm,setLoginForm]=useState({username:'',password:''});
 
   useEffect(()=>{
     if(!user) return;
+    setLoading(true);
     fetch(`${API_URL}?menu=${menu}&t=${Date.now()}`)
      .then(r=>r.json())
-     .then(j=>setRaw(j.data||[]))
-     .catch(()=>setRaw([]));
+     .then(j=>{
+       setRaw(j.data||[]);
+       setLoading(false);
+     })
+     .catch(()=>{
+       setRaw([]);
+       setLoading(false);
+     });
   },[user,menu]);
 
   const handleLogin=async(e)=>{
     e.preventDefault();
-    const {data} = await supabase.from('users').select('*').eq('username',loginForm.username).eq('password',loginForm.password).single();
-    if(!data){ alert('Login gagal'); return; }
+    const {data, error} = await supabase.from('users').select('*').eq('username',loginForm.username).eq('password',loginForm.password).single();
+    if(error || !data){ alert('Login gagal - cek username/password'); return; }
     localStorage.setItem('esdm_user',JSON.stringify(data));
     setUser(data);
   };
@@ -64,14 +76,16 @@ export default function App(){
     localStorage.removeItem('esdm_user');
     setUser(null);
     setRaw([]);
+    setSearch('');
+    setFilter('semua');
   };
 
   const nodesMerah = useMemo(()=> check3HariBerturut(raw), [raw]);
 
   const filtered = useMemo(()=>{
     let arr = [...raw].map(d=>({
-    ...d,
-      is3HPlus:!!nodesMerah[(d["Node/Pos"]||'').trim().toLowerCase()]
+     ...d,
+      is3HPlus: !!nodesMerah[(d["Node/Pos"]||'').trim().toLowerCase()]
     }));
     if(search){
       const s=search.toLowerCase();
@@ -87,44 +101,56 @@ export default function App(){
 
   if(!user) return (
     <div style={{minHeight:'100vh',background:'#0f172a',display:'flex',alignItems:'center',justifyContent:'center'}}>
-      <form onSubmit={handleLogin} style={{background:'#111c2f',padding:24,borderRadius:16,display:'grid',gap:12,width:320}}>
-        <h2 style={{color:'#fde047',fontWeight:900}}>ESDM LOGIN</h2>
-        <input value={loginForm.username} onChange={e=>setLoginForm({...loginForm,username:e.target.value})} placeholder="Username" style={{padding:12,borderRadius:10,background:'#0b1220',border:'1px solid #1e293b',color:'#fff'}}/>
-        <input type="password" value={loginForm.password} onChange={e=>setLoginForm({...loginForm,password:e.target.value})} placeholder="Password" style={{padding:12,borderRadius:10,background:'#0b1220',border:'1px solid #1e293b',color:'#fff'}}/>
-        <button style={{padding:12,borderRadius:10,background:'#fde047',fontWeight:800}}>Login</button>
+      <form onSubmit={handleLogin} style={{background:'#111c2f',padding:32,borderRadius:16,display:'grid',gap:16,width:340, border:'1px solid #1e293b'}}>
+        <h2 style={{color:'#fde047',fontWeight:900, textAlign:'center', margin:0}}>ESDM LOGIN</h2>
+        <input value={loginForm.username} onChange={e=>setLoginForm({...loginForm,username:e.target.value})} placeholder="Username (admin)" style={{padding:14,borderRadius:10,background:'#0b1220',border:'1px solid #1e293b',color:'#fff', outline:'none'}}/>
+        <input type="password" value={loginForm.password} onChange={e=>setLoginForm({...loginForm,password:e.target.value})} placeholder="Password" style={{padding:14,borderRadius:10,background:'#0b1220',border:'1px solid #1e293b',color:'#fff', outline:'none'}}/>
+        <button style={{padding:14,borderRadius:10,background:'#fde047',fontWeight:900, border:'none', cursor:'pointer', color:'#000'}}>Login</button>
       </form>
     </div>
   );
 
   return (
-    <div style={{minHeight:'100vh',background:'#0b1220',color:'#fff',display:'flex'}}>
-      <div style={{width:260,background:'#070d1a',borderRight:'1px solid #1e293b',padding:16,display:'flex',flexDirection:'column',minHeight:'100vh'}}>
-        <div style={{fontWeight:900,fontSize:18}}>ESDM MONITORING</div>
-        <div style={{fontSize:11,color:'#fde047'}}>{user.username} ({user.role})</div>
-        <button onClick={handleLogout} style={{marginTop:12,marginBottom:16,padding:12,borderRadius:8,background:'#ef4444',color:'#fff',fontWeight:900,border:'none',cursor:'pointer'}}>🚪 LOGOUT</button>
-        <button onClick={()=>setMenu('icon')} style={{padding:12,borderRadius:8,background:menu==='icon'?'#fff':'#111c2f',color:menu==='icon'?'#000':'#fff',fontWeight:700,textAlign:'left',marginBottom:8}}>📡 Node Icon</button>
-        <button onClick={()=>setMenu('dtp')} style={{padding:12,borderRadius:8,background:menu==='dtp'?'#fff':'#111c2f',color:menu==='dtp'?'#000':'#fff',fontWeight:700,textAlign:'left',marginBottom:8}}>📊 Node DTP</button>
-        <div style={{marginTop:'auto',fontSize:10,color:'#475569'}}>API: {menu} - {raw.length} data | 3H+: {count3H}</div>
+    <div style={{minHeight:'100vh',background:'#0b1220',color:'#fff',display:'flex', fontFamily:'Inter, system-ui, sans-serif'}}>
+      <div style={{width:260,background:'#070d1a',borderRight:'1px solid #1e293b',padding:16,display:'flex',flexDirection:'column', minHeight:'100vh', position:'sticky', top:0}}>
+        <div style={{fontWeight:900,fontSize:18, letterSpacing:'-0.5px'}}>ESDM MONITORING</div>
+        <div style={{fontSize:12,color:'#fde047', marginTop:4}}>{user.username} ({user.role})</div>
+        
+        <button onClick={handleLogout} style={{marginTop:16,marginBottom:16,padding:14,borderRadius:10,background:'#ef4444',color:'#fff',fontWeight:900,border:'none',cursor:'pointer', fontSize:14}}>🚪 LOGOUT</button>
+        
+        <button onClick={()=>{setMenu('icon'); setFilter('semua');}} style={{padding:14,borderRadius:10,background:menu==='icon'?'#fff':'#111c2f',color:menu==='icon'?'#000':'#fff',fontWeight:700,textAlign:'left',marginBottom:10, border: menu==='icon'?'1px solid #fff':'1px solid #1e293b', cursor:'pointer'}}>📡 Node Icon</button>
+        <button onClick={()=>{setMenu('dtp'); setFilter('semua');}} style={{padding:14,borderRadius:10,background:menu==='dtp'?'#fff':'#111c2f',color:menu==='dtp'?'#000':'#fff',fontWeight:700,textAlign:'left',marginBottom:10, border: menu==='dtp'?'1px solid #fff':'1px solid #1e293b', cursor:'pointer'}}>📊 Node DTP</button>
+        
+        <div style={{marginTop:'auto',fontSize:10,color:'#475569', lineHeight:'1.5'}}>
+          MENU: {menu.toUpperCase()}<br/>
+          TOTAL: {raw.length} data<br/>
+          3H+: {count3H} data<br/>
+          API: /api/data?menu={menu}
+        </div>
       </div>
 
       <div style={{flex:1,overflow:'auto',background:'#0f1a2f'}}>
-        <div style={{display:'flex',gap:8,padding:12,position:'sticky',top:0,background:'#0f1a2f',borderBottom:'1px solid #1e293b'}}>
-          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Cari..." style={{background:'#111c2f',border:'1px solid #1e293b',borderRadius:8,padding:'8px 12px',color:'#fff',width:280}}/>
-          <div style={{marginLeft:'auto',display:'flex',gap:6}}>
-            <button onClick={()=>setFilter('semua')} style={{padding:'6px 12px',borderRadius:20,fontSize:11,background:filter==='semua'?'#fff':'transparent',color:filter==='semua'?'#000':'#fff',border:'1px solid #334155'}}>Semua {raw.length}</button>
-            <button onClick={()=>setFilter('3hari')} style={{padding:'6px 12px',borderRadius:20,fontSize:11,background:filter==='3hari'?'#ef4444':'transparent',color:filter==='3hari'?'#fff':'#fca5a5',border:'1px solid #7f1d1d'}}>3H+ {count3H}</button>
+        <div style={{display:'flex',gap:12,padding:12,position:'sticky',top:0,background:'#0f1a2f',borderBottom:'1px solid #1e293b', zIndex:10, alignItems:'center'}}>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Cari Node/Pos, RFO, Duration..." style={{background:'#111c2f',border:'1px solid #1e293b',borderRadius:10,padding:'10px 14px',color:'#fff',width:320, outline:'none'}}/>
+          {loading && <span style={{fontSize:12, color:'#fde047'}}>Loading {menu}...</span>}
+          <div style={{marginLeft:'auto',display:'flex',gap:8}}>
+            <button onClick={()=>setFilter('semua')} style={{padding:'8px 16px',borderRadius:20,fontSize:12,fontWeight:700,background:filter==='semua'?'#fff':'transparent',color:filter==='semua'?'#000':'#fff',border:'1px solid #334155', cursor:'pointer'}}>Semua {raw.length}</button>
+            <button onClick={()=>setFilter('3hari')} style={{padding:'8px 16px',borderRadius:20,fontSize:12,fontWeight:700,background:filter==='3hari'?'#ef4444':'transparent',color:filter==='3hari'?'#fff':'#fca5a5',border:'1px solid #7f1d1d', cursor:'pointer'}}>🔥 3H+ {count3H}</button>
           </div>
         </div>
 
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-          <thead style={{background:'#1a2744',position:'sticky',top:49}}><tr style={{color:'#94a3b8',fontSize:11}}><th style={{padding:12,textAlign:'left'}}>TANGGAL</th><th style={{padding:12,textAlign:'left'}}>NODE/POS</th><th style={{padding:12,textAlign:'left'}}>KENDALA</th><th style={{padding:12}}>STATUS</th></tr></thead>
+          <thead style={{background:'#1a2744',position:'sticky',top:57, zIndex:5}}><tr style={{color:'#94a3b8',fontSize:11, textAlign:'left'}}><th style={{padding:14}}>TANGGAL</th><th style={{padding:14}}>NODE/POS</th><th style={{padding:14}}>KENDALA</th><th style={{padding:14, textAlign:'center'}}>STATUS</th></tr></thead>
           <tbody>
+            {filtered.length===0 && !loading && (
+              <tr><td colSpan={4} style={{padding:40, textAlign:'center', color:'#64748b'}}>Tidak ada data untuk menu {menu.toUpperCase()} - cek API /api/data?menu={menu}</td></tr>
+            )}
             {filtered.map((row,i)=>(
               <tr key={i} style={{background:i%2===0?'#132042':'#0f1a2f',borderBottom:'1px solid #1e293b'}}>
-                <td style={{padding:12,color:'#facc15'}}>{row.Tanggal}</td>
-                <td style={{padding:12,fontWeight:700}}>{clean(row["Node/Pos"])}</td>
-                <td style={{padding:12}}><div>Duration : {row.Duration}</div><div style={{color:'#94a3b8',fontSize:11}}>RFO : {row.RFO}</div></td>
-                <td style={{padding:12}}>{row.is3HPlus? <span style={{background:'#ef4444',color:'#fff',padding:'5px 12px',borderRadius:999,fontSize:11}}>🔥 3H+ MERAH</span> : <span style={{background:'#10b981',color:'#fff',padding:'5px 12px',borderRadius:999,fontSize:11}}>☑ Bagus</span>}</td>
+                <td style={{padding:14,color:'#facc15', fontWeight:600, whiteSpace:'nowrap'}}>{row.Tanggal}</td>
+                <td style={{padding:14,fontWeight:700}}>{clean(row["Node/Pos"])}</td>
+                <td style={{padding:14}}><div style={{fontWeight:600}}>Duration : {row.Duration}</div><div style={{color:'#94a3b8',fontSize:11, marginTop:4, lineHeight:'1.4'}}>RFO : {row.RFO}</div></td>
+                <td style={{padding:14, textAlign:'center'}}>{row.is3HPlus? <span style={{background:'#ef4444',color:'#fff',padding:'6px 12px',borderRadius:999,fontSize:11, fontWeight:800, display:'inline-block'}}>🔥 3H+ MERAH</span> : <span style={{background:'#10b981',color:'#fff',padding:'6px 12px',borderRadius:999,fontSize:11, fontWeight:700, display:'inline-block'}}>☑ Bagus</span>}</td>
               </tr>
             ))}
           </tbody>
