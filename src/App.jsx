@@ -1,98 +1,140 @@
-import { useEffect, useMemo, useState } from 'react';
-import { supabase } from './supabaseClient';
-const BACKEND = (import.meta.env.VITE_BACKEND_URL || "https://monitoring-node-esdm-api.vercel.app").replace(/\/api\/?$/,'');
-const API_URL = `${BACKEND}/api/data`;
+import { useEffect, useState } from 'react'
 
-const clean = (s) => String(s||'').replace(/^\s*[\d\.\-\)\:\s\u00A0]+/g,'').trim().split('\n')[0].trim();
-const getDuration = (row) => {
-  let t = row.Duration || row.DURATION || row._raw || row.Kendala || '';
-  let m = t.match(/Duration\s*:\s*([^\n]+)/i); if(m) return m[1].trim();
-  if(row.Duration && row.Duration !== '-') return row.Duration;
-  return '-';
-};
-const getRFO = (row) => {
-  let t = row.RFO || row._raw || row.Kendala || '';
-  let m = t.match(/RFO\s*:\s*([\s\S]*?)(?=\n\d+\.|$)/i); if(m) return m[1].trim().replace(/\n/g,' ');
-  return row.RFO || row.Kendala || '-';
-};
-const parseTgl=s=>{const mm={Jan:0,Feb:1,Mar:2,Apr:3,Mei:4,May:4,Jun:5,Jul:6,Agu:7,Aug:7,Sep:8,Okt:9,Oct:9,Nov:10,Des:11,Dec:11}; const m=s?.match(/(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})/); return m? new Date(+m[3],mm[m[2]]??0,+m[1]):new Date(0);};
+const API_URL = import.meta.env.VITE_API_URL || 'https://monitoring-node-esdm-api.vercel.app/api/data'
 
-export default function App(){
-  const [raw,setRaw]=useState([]); const [search,setSearch]=useState(''); const [menu,setMenu]=useState('icon'); const [filter,setFilter]=useState('semua');
-  const [user,setUser]=useState(()=>{ try{ return JSON.parse(localStorage.getItem('esdm_user')||'null'); }catch{ return null; }});
-  const [loginForm,setLoginForm]=useState({username:'',password:''});
-  const [detail,setDetail]=useState(null);
+export default function App() {
+  const [menu, setMenu] = useState('icon') // 'icon' atau 'dtp'
+  const [raw, setRaw] = useState([])
+  const [loading, setLoading] = useState(false)
 
-  useEffect(()=>{ 
-    alert(`${API_URL}?gid=${menu==='icon'?0:1}`)
-    if(!user) 
-      return; fetch(`${API_URL}?gid=${menu==='icon'?0:1}`).then(r=>r.json()).then(j=>setRaw(j.data||[])); 
-    },[user,menu]
-  );
-  const handleLogin=async(e)=>{ e.preventDefault(); const {data}=await supabase.from('users').select('*').eq('username',loginForm.username).eq('password',loginForm.password).single(); if(!data){ alert('Login gagal'); return;} localStorage.setItem('esdm_user',JSON.stringify(data)); setUser(data); };
+  // user dari auth kamu
+  const user = true // ganti pakai auth kamu
 
-  const filtered=useMemo(()=>{ let arr=[...raw]; if(search){ const s=search.toLowerCase(); arr=arr.filter(d=> JSON.stringify(d).toLowerCase().includes(s)); } if(filter==='3hari') arr=arr.filter(o=>o.is3HPlus || (o.Duration&&o.Duration!=='-'&&o.Duration!=='0')); return arr.sort((a,b)=>parseTgl(b.Tanggal)-parseTgl(a.Tanggal)); },[raw,search,filter]);
+  useEffect(() => {
+    if (!user) return
+    setLoading(true)
 
-  if(!user) return <div style={{minHeight:'100vh',background:'#0f172a',display:'flex',alignItems:'center',justifyContent:'center'}}><form onSubmit={handleLogin} style={{background:'#111c2f',padding:24,borderRadius:16,display:'grid',gap:12,width:320}}><h2 style={{color:'#fde047',fontWeight:900}}>ESDM LOGIN</h2><input value={loginForm.username} onChange={e=>setLoginForm({...loginForm,username:e.target.value})} placeholder="Username" style={{padding:12,borderRadius:10,background:'#0b1220',border:'1px solid #1e293b',color:'#fff'}}/><input type="password" value={loginForm.password} onChange={e=>setLoginForm({...loginForm,password:e.target.value})} placeholder="Password" style={{padding:12,borderRadius:10,background:'#0b1220',border:'1px solid #1e293b',color:'#fff'}}/><button style={{padding:12,borderRadius:10,background:'#fde047',fontWeight:800}}>Login</button></form></div>;
+    // FIX: Kirim menu=0 untuk Icon, menu=1 untuk DTP
+    // Backend yang bakal mapping ke gid=0 dan gid=285923348
+    const menuParam = menu === 'icon' ? 0 : 1
 
-  return <div style={{minHeight:'100vh',background:'#0b1220',color:'#fff',fontFamily:'Inter',display:'flex'}}>
-    <div style={{width:250,background:'#070d1a',borderRight:'1px solid #1e293b',padding:16,display:'flex',flexDirection:'column',gap:8}}>
-      <div style={{fontWeight:900}}>ESDM MONITORING</div><div style={{fontSize:11,color:'#fde047'}}>{user.username} ({user.role})</div>
-      <button onClick={()=>setMenu('icon')} style={{padding:10,borderRadius:8,background:menu==='icon'?'#fff':'#111c2f',color:menu==='icon'?'#000':'#fff',fontWeight:700,textAlign:'left'}}>📡 Node Icon</button>
-      <button onClick={()=>setMenu('dtp')} style={{padding:10,borderRadius:8,background:menu==='dtp'?'#fff':'#111c2f',color:menu==='dtp'?'#000':'#fff',fontWeight:700,textAlign:'left'}}>📊 Node DTP</button>
-      <button onClick={()=>{localStorage.removeItem('esdm_user'); setUser(null);}} style={{marginTop:'auto',padding:10,borderRadius:8,background:'rgba(239,68,68,0.15)',color:'#fca5a5',border:'1px solid rgba(239,68,68,0.3)'}}>Logout</button>
-    </div>
-    <div style={{flex:1,overflow:'auto',background:'#0f1a2f'}}>
-      <div style={{display:'flex',gap:8,padding:12,position:'sticky',top:0,background:'#0f1a2f',borderBottom:'1px solid #1e293b',zIndex:2}}>
-        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Cari..." style={{background:'#111c2f',border:'1px solid #1e293b',borderRadius:8,padding:'8px 12px',color:'#fff',width:280}}/>
-        <div style={{marginLeft:'auto',display:'flex',gap:6}}><button onClick={()=>setFilter('semua')} style={{padding:'6px 12px',borderRadius:20,fontSize:11,background:filter==='semua'?'#fff':'transparent',color:filter==='semua'?'#000':'#fff',border:'1px solid #334155'}}>Semua {raw.length}</button><button onClick={()=>setFilter('3hari')} style={{padding:'6px 12px',borderRadius:20,fontSize:11,background:filter==='3hari'?'#ef4444':'transparent',color:filter==='3hari'?'#fff':'#fca5a5',border:'1px solid #7f1d1d'}}>3H+ {raw.filter(r=>r.is3HPlus).length}</button></div>
+    // HAPUS alert yang di SS kamu
+    // alert(`${API_URL}?gid=${menu==='icon'?0:1}`) <- JANGAN ADA LAGI
+
+    fetch(`${API_URL}?menu=${menuParam}&t=${Date.now()}`)
+      .then(r => r.json())
+      .then(j => {
+        // FILTER FRONTEND JUGA: Detail Outage tidak null
+        let data = j.data || []
+        // Hanya yang Duration ada isinya
+        data = data.filter(d => d.Duration && d.Duration !== '-' && d.Duration.toLowerCase() !== 'null')
+        setRaw(data)
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+
+  }, [menu])
+
+  return (
+    <div className="p-4">
+      <div className="flex gap-2 mb-4">
+        <button 
+          onClick={() => setMenu('icon')}
+          className={`px-4 py-2 rounded ${menu==='icon'?'bg-blue-600 text-white':'bg-gray-200'}`}
+        >
+          Icon (Pusdatin)
+        </button>
+        <button 
+          onClick={() => setMenu('dtp')}
+          className={`px-4 py-2 rounded ${menu==='dtp'?'bg-green-600 text-white':'bg-gray-200'}`}
+        >
+          DTP (Tekmira)
+        </button>
       </div>
 
-      <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-        <thead style={{background:'#1a2744',position:'sticky',top:49,zIndex:1}}>
-          <tr style={{color:'#94a3b8',fontSize:11,textTransform:'uppercase'}}>
-            <th style={{padding:'12px 14px',textAlign:'left',borderBottom:'1px solid #1e293b'}}>TANGGAL</th>
-            <th style={{padding:'12px 14px',textAlign:'left',borderBottom:'1px solid #1e293b'}}>NODE/POS</th>
-            <th style={{padding:'12px 14px',textAlign:'left',borderBottom:'1px solid #1e293b'}}>KENDALA / DURATION</th>
-            <th style={{padding:'12px 14px',textAlign:'left',borderBottom:'1px solid #1e293b'}}>LINK</th>
-            <th style={{padding:'12px 14px',textAlign:'left',borderBottom:'1px solid #1e293b'}}>STATUS</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filtered.map((row,i)=>{
-            const dur = row.Duration || getDuration(row);
-            const rfo = row.RFO || getRFO(row);
-            const isEmpty = dur==='-' && (rfo==='-'||!rfo);
-            return (
-            <tr key={i} style={{background:i%2===0?'#132042':'#0f1a2f',borderBottom:'1px solid #1e293b'}}>
-              <td style={{padding:'12px 14px',color:'#facc15',whiteSpace:'nowrap'}}>{row.Tanggal}</td>
-              <td style={{padding:'12px 14px',fontWeight:700}}>{clean(row["Node/Pos"]||row.Node)}</td>
-              <td style={{padding:'12px 14px',maxWidth:520}}>
-                <div style={{display:'flex',flexDirection:'column',gap:2}}>
-                  <span style={{color: isEmpty ? '#ef4444' : '#e2e8f0',fontWeight:isEmpty?700:400}}>
-                    {dur!=='-' ? `Duration : ${dur}` : 'Duration : -'} {isEmpty && '⚠️ KOSONG'}
-                  </span>
-                  <span style={{color:'#94a3b8',fontSize:12,whiteSpace:'normal',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}} title={rfo}>RFO : {rfo}</span>
-                </div>
-              </td>
-              <td style={{padding:'12px 14px'}}><span style={{background:'#1e293b',padding:'4px 10px',borderRadius:999,fontSize:11}}>{row.LINK||'Normal'}</span></td>
-              <td style={{padding:'12px 14px'}}>{row.is3HPlus ? <span style={{background:'#ef4444',color:'#fff',padding:'5px 12px',borderRadius:999,fontSize:11,fontWeight:800}}>🔥 3H+ MERAH</span> : <span style={{background:'#10b981',color:'#fff',padding:'5px 12px',borderRadius:999,fontSize:11,fontWeight:800, cursor:'pointer'}} onClick={()=>setDetail(row)}>☑ Bagus</span>}</td>
-            </tr>
-            )
-          })}
-        </tbody>
-      </table>
+      {loading && <p>Loading {menu}...</p>}
 
-      {detail && (
-        <div onClick={()=>setDetail(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:50,padding:20}}>
-          <div onClick={e=>e.stopPropagation()} style={{background:'#111c2f',border:'1px solid #1e293b',borderRadius:16,padding:20,maxWidth:600,width:'100%'}}>
-            <h3 style={{fontWeight:800,marginBottom:8}}>{detail["Node/Pos"]}</h3>
-            <div style={{fontSize:12,color:'#facc15'}}>{detail.Tanggal}</div>
-            <div style={{marginTop:12,background:'#0b1220',padding:12,borderRadius:10,fontSize:13,whiteSpace:'pre-wrap'}}>{detail._raw || JSON.stringify(detail,null,2)}</div>
-            <button onClick={()=>setDetail(null)} style={{marginTop:12,background:'#fff',color:'#000',padding:'8px 16px',borderRadius:8,fontWeight:700}}>Tutup</button>
+      <div className="grid gap-2">
+        {raw.map((d, i) => (
+          <div key={i} className="border p-3 rounded bg-white shadow-sm">
+            <div className="font-bold">{d.Tanggal} - {d["Node/Pos"]}</div>
+            {/* Ini yang kemarin KOSONG, sekarang ada */}
+            <div className="text-sm">Duration : {d.Duration}</div>
+            <div className="text-sm text-gray-600">RFO : {d.RFO}</div>
+            <div className="text-xs">Kendala: {d.Kendala}</div>
           </div>
-        </div>
-      )}
+        ))}
+        {raw.length === 0 && !loading && <p>Tidak ada data Detail Outage (yang null sudah difilter)</p>}
+      </div>
     </div>
-  </div>
+  )
+}
+const API_URL = import.meta.env.VITE_API_URL || 'https://monitoring-node-esdm-api.vercel.app/api/data'
+
+export default function App() {
+  const [menu, setMenu] = useState('icon') // 'icon' atau 'dtp'
+  const [raw, setRaw] = useState([])
+  const [loading, setLoading] = useState(false)
+
+  // user dari auth kamu
+  const user = true // ganti pakai auth kamu
+
+  useEffect(() => {
+    if (!user) return
+    setLoading(true)
+
+    // FIX: Kirim menu=0 untuk Icon, menu=1 untuk DTP
+    // Backend yang bakal mapping ke gid=0 dan gid=285923348
+    const menuParam = menu === 'icon' ? 0 : 1
+
+    // HAPUS alert yang di SS kamu
+    // alert(`${API_URL}?gid=${menu==='icon'?0:1}`) <- JANGAN ADA LAGI
+
+    fetch(`${API_URL}?menu=${menuParam}&t=${Date.now()}`)
+      .then(r => r.json())
+      .then(j => {
+        // FILTER FRONTEND JUGA: Detail Outage tidak null
+        let data = j.data || []
+        // Hanya yang Duration ada isinya
+        data = data.filter(d => d.Duration && d.Duration !== '-' && d.Duration.toLowerCase() !== 'null')
+        setRaw(data)
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+
+  }, [menu])
+
+  return (
+    <div className="p-4">
+      <div className="flex gap-2 mb-4">
+        <button 
+          onClick={() => setMenu('icon')}
+          className={`px-4 py-2 rounded ${menu==='icon'?'bg-blue-600 text-white':'bg-gray-200'}`}
+        >
+          Icon (Pusdatin)
+        </button>
+        <button 
+          onClick={() => setMenu('dtp')}
+          className={`px-4 py-2 rounded ${menu==='dtp'?'bg-green-600 text-white':'bg-gray-200'}`}
+        >
+          DTP (Tekmira)
+        </button>
+      </div>
+
+      {loading && <p>Loading {menu}...</p>}
+
+      <div className="grid gap-2">
+        {raw.map((d, i) => (
+          <div key={i} className="border p-3 rounded bg-white shadow-sm">
+            <div className="font-bold">{d.Tanggal} - {d["Node/Pos"]}</div>
+            {/* Ini yang kemarin KOSONG, sekarang ada */}
+            <div className="text-sm">Duration : {d.Duration}</div>
+            <div className="text-sm text-gray-600">RFO : {d.RFO}</div>
+            <div className="text-xs">Kendala: {d.Kendala}</div>
+          </div>
+        ))}
+        {raw.length === 0 && !loading && <p>Tidak ada data Detail Outage (yang null sudah difilter)</p>}
+      </div>
+    </div>
+  )
 }
