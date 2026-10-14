@@ -10,35 +10,39 @@ const parseTgl = s => {
   const mm={Jan:0,Feb:1,Mar:2,Apr:3,Mei:4,May:4,Jun:5,Jul:6,Agu:7,Aug:7,Sep:8,Okt:9,Oct:9,Nov:10,Des:11,Dec:11};
   const m=s?.match(/(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})/);
   if(!m) return null;
-  return new Date(+m[3], mm[m[2]]??0, +m[1]); // jam 00:00
+  return new Date(+m[3], mm[m[2]]??0, +m[1]);
 };
 
-// LOGIC BENER: 11,12,13 Okt = 3 hari berturut
+// 3 HARI BERTURUT = 11,12,13 Okt semua ADA kendala node yang SAMA
 const check3HariBerturut = (allData) => {
-  const map = {}; // Node -> [timestamp hari]
+  const map = {};
   allData.forEach(d=>{
     const t = parseTgl(d.Tanggal);
     if(!t) return;
     const day = new Date(t.getFullYear(), t.getMonth(), t.getDate()).getTime();
-    const key = d["Node/Pos"].trim();
+    const key = d["Node/Pos"].trim().toLowerCase(); // biar Pos PGA Lamongan = pos pga lamongan
     if(!map[key]) map[key]=new Set();
     map[key].add(day);
   });
 
-  const result = {};
+  const merah = {};
   Object.keys(map).forEach(node=>{
     const days = Array.from(map[node]).sort((a,b)=>a-b);
-    // cek sliding window 3 hari
     for(let i=0;i<=days.length-3;i++){
       const oneDay = 86400000;
+      // harus selisih tepat 1 hari
       if(days[i+1]-days[i]===oneDay && days[i+2]-days[i+1]===oneDay){
-        result[node]=days.map(d=>new Date(d).toLocaleDateString('id-ID')); // buat debug
+        merah[node]=true;
         break;
       }
     }
   });
-  return result;
+  return merah; // isinya { "pos pga lamongan": true }
 };
+
+// di dalam component
+const nodesMerah = useMemo(()=> check3HariBerturut(raw), [raw]);
+
 
 export default function App(){
   const [raw,setRaw]=useState([]); const [search,setSearch]=useState(''); const [menu,setMenu]=useState('icon'); const [filter,setFilter]=useState('semua');
@@ -71,18 +75,15 @@ export default function App(){
   
   
   
+
 const filtered = useMemo(()=>{
-  let arr=[...raw];
-
-  // INI YANG BENER: 3 hari berturut-turut, bukan cuma 3x muncul
-  const nodes3Hari = check3HariBerturut(raw);
-  arr = arr.map(d=>({...d, is3HPlus:!!nodes3Hari[d["Node/Pos"]] }));
-
-  if(search){ const s=search.toLowerCase(); arr=arr.filter(d=> JSON.stringify(d).toLowerCase().includes(s)); }
-  if(filter==='3hari') arr=arr.filter(o=>o.is3HPlus);
+  let arr = [...raw].map(d=>({
+   ...d,
+    is3HPlus:!!nodesMerah[d["Node/Pos"].trim().toLowerCase()]
+  }));
+  if(filter==='3hari') arr = arr.filter(o=>o.is3HPlus);
   return arr.sort((a,b)=>(parseTgl(b.Tanggal)?.getTime()||0)-(parseTgl(a.Tanggal)?.getTime()||0));
-},[raw,search,filter]);
-
+},[raw, filter, nodesMerah]);
 // Untuk hitung badge 3H+ di atas
 const count3H = useMemo(()=>{
   const nodes = check3HariBerturut(raw);
