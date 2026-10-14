@@ -24,7 +24,6 @@ export default function App(){
   const [detail,setDetail]=useState(null);
 
   useEffect(()=>{ 
-    alert(`${API_URL}?gid=${menu==='icon'?0:1}`)
     if(!user) 
       return; fetch(`${API_URL}?gid=${menu==='icon'?0:1}`).then(r=>r.json()).then(j=>setRaw(j.data||[])); 
     },[user,menu]
