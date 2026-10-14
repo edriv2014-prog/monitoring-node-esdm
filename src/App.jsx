@@ -10,31 +10,27 @@ export default function App() {
   // user dari auth kamu
   const user = true // ganti pakai auth kamu
 
+  
+  
   useEffect(() => {
-    if (!user) return
-    setLoading(true)
+  if (!user) return
+  const menuParam = menu === 'icon'? 0 : 1
+  console.log('FETCH:', `${API_URL}?menu=${menuParam}`) // cek di Console F12
 
-    // FIX: Kirim menu=0 untuk Icon, menu=1 untuk DTP
-    // Backend yang bakal mapping ke gid=0 dan gid=285923348
-    const menuParam = menu === 'icon' ? 0 : 1
+  fetch(`${API_URL}?menu=${menuParam}&t=${Date.now()}`)
+   .then(r => r.json())
+   .then(j => {
+      console.log('API RESULT:', j) // LIHAT DI F12 -> Console
+      setRaw(j.data || [])
+    })
+}, [menu])
 
-    // HAPUS alert yang di SS kamu
-    // alert(`${API_URL}?gid=${menu==='icon'?0:1}`) <- JANGAN ADA LAGI
-
-    fetch(`${API_URL}?menu=${menuParam}&t=${Date.now()}`)
-      .then(r => r.json())
-      .then(j => {
-        // FILTER FRONTEND JUGA: Detail Outage tidak null
-        let data = j.data || []
-        // Hanya yang Duration ada isinya
-        data = data.filter(d => d.Duration && d.Duration !== '-' && d.Duration.toLowerCase() !== 'null')
-        setRaw(data)
-        setLoading(false)
-      })
-      .catch(() => setLoading(false))
-
-  }, [menu])
-
+// Di render, JANGAN FILTER LAGI
+// {raw.filter...} HAPUS, pakai raw langsung
+{raw.map((d,i)=>(
+  <div key={i}>{d.Tanggal} - {d["Node/Pos"]} - {d.Duration}</div>
+))}
+  
   return (
     <div className="p-4">
       <div className="flex gap-2 mb-4">
