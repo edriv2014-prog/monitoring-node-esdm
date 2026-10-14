@@ -9,39 +9,36 @@ const clean = (s) => String(s||'').replace(/^\s*[\d\.\-\)\:\s\u00A0]+/g,'').trim
 const parseTgl = s => {
   const mm={Jan:0,Feb:1,Mar:2,Apr:3,Mei:4,May:4,Jun:5,Jul:6,Agu:7,Aug:7,Sep:8,Okt:9,Oct:9,Nov:10,Des:11,Dec:11};
   const m=s?.match(/(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})/);
-  return m? new Date(+m[3],mm[m[2]]??0,+m[1]) : null;
+  if(!m) return null;
+  return new Date(+m[3], mm[m[2]]??0, +m[1]); // jam 00:00
 };
 
-// Cek 3 hari berturut-turut beneran
+// LOGIC BENER: 11,12,13 Okt = 3 hari berturut
 const check3HariBerturut = (allData) => {
-  const map = {}; // Node -> [Date]
+  const map = {}; // Node -> [timestamp hari]
   allData.forEach(d=>{
     const t = parseTgl(d.Tanggal);
     if(!t) return;
-    const key = d["Node/Pos"];
-    if(!map[key]) map[key]=[];
-    // simpan timestamp hari (tanpa jam)
     const day = new Date(t.getFullYear(), t.getMonth(), t.getDate()).getTime();
-    if(!map[key].includes(day)) map[key].push(day);
+    const key = d["Node/Pos"].trim();
+    if(!map[key]) map[key]=new Set();
+    map[key].add(day);
   });
 
   const result = {};
   Object.keys(map).forEach(node=>{
-    const days = map[node].sort((a,b)=>a-b);
-    // cek ada 3 hari yang selisih 1 hari terus
+    const days = Array.from(map[node]).sort((a,b)=>a-b);
+    // cek sliding window 3 hari
     for(let i=0;i<=days.length-3;i++){
-      const d1 = days[i], d2 = days[i+1], d3 = days[i+2];
-      const oneDay = 24*60*60*1000;
-      if((d2-d1===oneDay) && (d3-d2===oneDay)){
-        result[node]=true;
+      const oneDay = 86400000;
+      if(days[i+1]-days[i]===oneDay && days[i+2]-days[i+1]===oneDay){
+        result[node]=days.map(d=>new Date(d).toLocaleDateString('id-ID')); // buat debug
         break;
       }
-      // kalau muncul 3x di hari yang sama beda jam juga anggap 3H+? hapus kalau gak mau
     }
   });
   return result;
 };
-
 
 export default function App(){
   const [raw,setRaw]=useState([]); const [search,setSearch]=useState(''); const [menu,setMenu]=useState('icon'); const [filter,setFilter]=useState('semua');
@@ -66,6 +63,14 @@ export default function App(){
     setRaw([]);
   };
 
+ 
+  
+  
+  
+  
+  
+  
+  
 const filtered = useMemo(()=>{
   let arr=[...raw];
 
