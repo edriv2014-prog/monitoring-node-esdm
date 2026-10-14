@@ -52,10 +52,7 @@ export default function App(){
     setLoading(true);
     fetch(`${API_URL}?menu=${menu}&t=${Date.now()}`)
      .then(r=>r.json())
-     .then(j=>{
-       setRaw(j.data||[]);
-       setLoading(false);
-     })
+     .then(j=>{ setRaw(j.data||[]); setLoading(false); })
      .catch(()=>{ setRaw([]); setLoading(false); });
   },[user,menu]);
 
@@ -74,18 +71,25 @@ export default function App(){
 
   const nodesMerah = useMemo(()=> check3HariBerturut(raw), [raw]);
 
+  // V7: SEARCH FILTER - NGIKUTIN PENCARIAN!
+  const searchFiltered = useMemo(()=>{
+    if(!search.trim()) return raw;
+    const s = search.toLowerCase().trim();
+    return raw.filter(d => (d["Node/Pos"]||'').toLowerCase().includes(s));
+  },[raw, search]);
+
+  // COUNT YANG NGIKUTIN SEARCH!
+  const countAllSearch = searchFiltered.length;
+  const count3HSearch = useMemo(()=>{
+    return searchFiltered.filter(r=> nodesMerah[(r["Node/Pos"]||'').trim().toLowerCase()]).length;
+  },[searchFiltered, nodesMerah]);
+
+  // TABLE YANG DITAMPILIN
   const filtered = useMemo(()=>{
-    let arr = [...raw].map(d=>({...d, is3HPlus: !!nodesMerah[(d["Node/Pos"]||'').trim().toLowerCase()]}));
-    // FIX SEARCH V6: CUMA DI NODE/POS DOANG! JOGLO & TANGKOKO GAK IKUT!
-    if(search.trim()){
-      const s=search.toLowerCase().trim();
-      arr=arr.filter(d=> (d["Node/Pos"]||'').toLowerCase().includes(s));
-    }
+    let arr = [...searchFiltered].map(d=>({...d, is3HPlus: !!nodesMerah[(d["Node/Pos"]||'').trim().toLowerCase()]}));
     if(filter==='3hari') arr=arr.filter(o=>o.is3HPlus);
     return arr.sort((a,b)=>(parseTgl(b.Tanggal)?.getTime()||0)-(parseTgl(a.Tanggal)?.getTime()||0));
-  },[raw, search, filter, nodesMerah]);
-
-  const count3H = useMemo(()=> raw.filter(r=> nodesMerah[(r["Node/Pos"]||'').trim().toLowerCase()]).length,[raw, nodesMerah]);
+  },[searchFiltered, filter, nodesMerah]);
 
   if(!user) return (
     <div style={{minHeight:'100vh',background:'#0f172a',display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -106,7 +110,7 @@ export default function App(){
         <button onClick={handleLogout} style={{marginTop:16,marginBottom:16,padding:14,borderRadius:10,background:'#ef4444',color:'#fff',fontWeight:900,border:'none',cursor:'pointer'}}>🚪 LOGOUT</button>
         <button onClick={()=>{setMenu('icon'); setFilter('semua');}} style={{padding:14,borderRadius:10,background:menu==='icon'?'#fff':'#111c2f',color:menu==='icon'?'#000':'#fff',fontWeight:700,textAlign:'left',marginBottom:10, border:'1px solid #1e293b', cursor:'pointer'}}>📡 Node Icon</button>
         <button onClick={()=>{setMenu('dtp'); setFilter('semua');}} style={{padding:14,borderRadius:10,background:menu==='dtp'?'#fff':'#111c2f',color:menu==='dtp'?'#000':'#fff',fontWeight:700,textAlign:'left',marginBottom:10, border:'1px solid #1e293b', cursor:'pointer'}}>📊 Node DTP</button>
-        <div style={{marginTop:'auto',fontSize:10,color:'#475569'}}>MENU: {menu.toUpperCase()}<br/>TOTAL: {raw.length}<br/>3H+: {count3H}<br/>API: {API_URL}?menu={menu}</div>
+        <div style={{marginTop:'auto',fontSize:10,color:'#475569'}}>MENU: {menu.toUpperCase()}<br/>TOTAL: {raw.length}<br/>SEARCH: {countAllSearch}<br/>3H+ SEARCH: {count3HSearch}<br/>API: {API_URL}</div>
       </div>
 
       <div style={{flex:1,overflow:'auto',background:'#0f1a2f'}}>
@@ -114,8 +118,8 @@ export default function App(){
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Cari Node/Pos..." style={{background:'#111c2f',border:'1px solid #1e293b',borderRadius:10,padding:'10px 14px',color:'#fff',width:320}}/>
           {loading && <span style={{fontSize:12, color:'#fde047'}}>Loading {menu}...</span>}
           <div style={{marginLeft:'auto',display:'flex',gap:8}}>
-            <button onClick={()=>setFilter('semua')} style={{padding:'8px 16px',borderRadius:20,fontSize:12,fontWeight:700,background:filter==='semua'?'#fff':'transparent',color:filter==='semua'?'#000':'#fff',border:'1px solid #334155', cursor:'pointer'}}>Semua {raw.length}</button>
-            <button onClick={()=>setFilter('3hari')} style={{padding:'8px 16px',borderRadius:20,fontSize:12,fontWeight:700,background:filter==='3hari'?'#ef4444':'transparent',color:filter==='3hari'?'#fff':'#fca5a5',border:'1px solid #7f1d1d', cursor:'pointer'}}>🔥 3H+ {count3H}</button>
+            <button onClick={()=>setFilter('semua')} style={{padding:'8px 16px',borderRadius:20,fontSize:12,fontWeight:700,background:filter==='semua'?'#fff':'transparent',color:filter==='semua'?'#000':'#fff',border:'1px solid #334155', cursor:'pointer'}}>Semua {countAllSearch}</button>
+            <button onClick={()=>setFilter('3hari')} style={{padding:'8px 16px',borderRadius:20,fontSize:12,fontWeight:700,background:filter==='3hari'?'#ef4444':'transparent',color:filter==='3hari'?'#fff':'#fca5a5',border:'1px solid #7f1d1d', cursor:'pointer'}}>🔥 3H+ {count3HSearch}</button>
           </div>
         </div>
 
