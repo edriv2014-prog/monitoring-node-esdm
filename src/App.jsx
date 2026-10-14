@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from './supabaseClient';
 
+// PAKAI INTERNAL API GAMMA SENDIRI - JANGAN EXTERNAL LAGI
 const BACKEND = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "").replace(/\/api\/?$/, "");
 const API_URL = BACKEND ? `${BACKEND}/api/data` : `/api/data`;
 
@@ -159,6 +160,4 @@ export default function App(){
     </div>
   )
 }
-
-
 
