@@ -23,7 +23,12 @@ export default function App(){
   const [loginForm,setLoginForm]=useState({username:'',password:''});
   const [detail,setDetail]=useState(null);
 
-  useEffect(()=>{ if(!user) return; fetch(`${API_URL}?gid=${menu==='icon'?0:1}`).then(r=>r.json()).then(j=>setRaw(j.data||[])); },[user,menu]);
+  useEffect(()=>{ 
+    alert(`${API_URL}?gid=${menu==='icon'?0:1}`)
+    if(!user) 
+      return; fetch(`${API_URL}?gid=${menu==='icon'?0:1}`).then(r=>r.json()).then(j=>setRaw(j.data||[])); 
+    },[user,menu]
+  );
   const handleLogin=async(e)=>{ e.preventDefault(); const {data}=await supabase.from('users').select('*').eq('username',loginForm.username).eq('password',loginForm.password).single(); if(!data){ alert('Login gagal'); return;} localStorage.setItem('esdm_user',JSON.stringify(data)); setUser(data); };
 
   const filtered=useMemo(()=>{ let arr=[...raw]; if(search){ const s=search.toLowerCase(); arr=arr.filter(d=> JSON.stringify(d).toLowerCase().includes(s)); } if(filter==='3hari') arr=arr.filter(o=>o.is3HPlus || (o.Duration&&o.Duration!=='-'&&o.Duration!=='0')); return arr.sort((a,b)=>parseTgl(b.Tanggal)-parseTgl(a.Tanggal)); },[raw,search,filter]);
