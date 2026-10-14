@@ -66,7 +66,6 @@ export default function App(){
     setRaw([]);
   };
 
- DI DALAM COMPONENT ===
 const filtered = useMemo(()=>{
   let arr=[...raw];
 
@@ -96,8 +95,7 @@ const count3H = useMemo(()=>{
     </div>
   );
 
-  const count3H = raw.filter(r=>{ const f={}; raw.forEach(x=>{f[x["Node/Pos"]]=(f[x["Node/Pos"]]||0)+1}); return f[r["Node/Pos"]]>=3; }).length;
-
+  
   return (
     <div style={{minHeight:'100vh',background:'#0b1220',color:'#fff',display:'flex'}}>
       {/* SIDEBAR */}
